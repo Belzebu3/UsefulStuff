@@ -33,6 +33,28 @@ local defaults = {
         MultiBar6 = false,
         MultiBar7 = false,
     },
+    combatTimer = {
+        enabled = true,
+        borderSize = 1,
+        font = "Friz Quadrata TT",
+        fontSize = 14,
+        bgTexture = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        borderColor = {r = 1, g = 0, b = 0, a = 1},
+        anchorFrame = "AUTO",
+        anchorPoint = "TOP",
+        anchorRelativePoint = "BOTTOM",
+        anchorOffsetX = 0,
+        anchorOffsetY = -5,
+    },
+    autoLogging = {
+        dungeonsMythicPlus = false,
+        raidMythic = false,
+        raidHeroic = false,
+        raidNormal = false,
+        raidFinder = false,
+        arena = false,
+        scenarios = false,
+    },
 }
 
 -- Initialize settings
@@ -90,6 +112,50 @@ local function InitializeSettings()
     for barName, defaultValue in pairs(defaults.actionBarsMouseover) do
         if UsefullStuffDB.actionBarsMouseover[barName] == nil then
             UsefullStuffDB.actionBarsMouseover[barName] = defaultValue
+        end
+    end
+    if not UsefullStuffDB.combatTimer then
+        UsefullStuffDB.combatTimer = {}
+    end
+    if UsefullStuffDB.combatTimer.enabled == nil then
+        UsefullStuffDB.combatTimer.enabled = defaults.combatTimer.enabled
+    end
+    if not UsefullStuffDB.combatTimer.borderSize then
+        UsefullStuffDB.combatTimer.borderSize = defaults.combatTimer.borderSize
+    end
+    if not UsefullStuffDB.combatTimer.font then
+        UsefullStuffDB.combatTimer.font = defaults.combatTimer.font
+    end
+    if not UsefullStuffDB.combatTimer.fontSize then
+        UsefullStuffDB.combatTimer.fontSize = defaults.combatTimer.fontSize
+    end
+    if not UsefullStuffDB.combatTimer.bgTexture then
+        UsefullStuffDB.combatTimer.bgTexture = defaults.combatTimer.bgTexture
+    end
+    if not UsefullStuffDB.combatTimer.borderColor then
+        UsefullStuffDB.combatTimer.borderColor = {r = defaults.combatTimer.borderColor.r, g = defaults.combatTimer.borderColor.g, b = defaults.combatTimer.borderColor.b, a = defaults.combatTimer.borderColor.a}
+    end
+    if not UsefullStuffDB.combatTimer.anchorFrame then
+        UsefullStuffDB.combatTimer.anchorFrame = defaults.combatTimer.anchorFrame
+    end
+    if not UsefullStuffDB.combatTimer.anchorPoint then
+        UsefullStuffDB.combatTimer.anchorPoint = defaults.combatTimer.anchorPoint
+    end
+    if not UsefullStuffDB.combatTimer.anchorRelativePoint then
+        UsefullStuffDB.combatTimer.anchorRelativePoint = defaults.combatTimer.anchorRelativePoint
+    end
+    if not UsefullStuffDB.combatTimer.anchorOffsetX then
+        UsefullStuffDB.combatTimer.anchorOffsetX = defaults.combatTimer.anchorOffsetX
+    end
+    if not UsefullStuffDB.combatTimer.anchorOffsetY then
+        UsefullStuffDB.combatTimer.anchorOffsetY = defaults.combatTimer.anchorOffsetY
+    end
+    if not UsefullStuffDB.autoLogging then
+        UsefullStuffDB.autoLogging = {}
+    end
+    for logType, defaultValue in pairs(defaults.autoLogging) do
+        if UsefullStuffDB.autoLogging[logType] == nil then
+            UsefullStuffDB.autoLogging[logType] = defaultValue
         end
     end
 end
@@ -418,6 +484,214 @@ combatEventFrame:SetScript("OnEvent", function(self, event)
     end
 end)
 
+-- Combat Timer
+local combatTimerFrame = CreateFrame("Frame", "UsefullStuff_CombatTimer", UIParent, "BackdropTemplate")
+combatTimerFrame:SetSize(80, 30)
+combatTimerFrame:SetFrameStrata("MEDIUM")
+combatTimerFrame:Hide()
+
+local combatTimerText = combatTimerFrame:CreateFontString(nil, "OVERLAY")
+combatTimerText:SetPoint("CENTER")
+combatTimerText:SetJustifyH("CENTER")
+
+local combatStartTime = 0
+local combatTimerUpdateFrame = CreateFrame("Frame")
+
+-- Function to find and anchor to player unit frame
+local function AnchorCombatTimer()
+    combatTimerFrame:ClearAllPoints()
+
+    local settings = UsefullStuffDB.combatTimer
+    local frameName = settings.anchorFrame
+    local targetFrame = nil
+
+    -- Auto detection
+    if frameName == "AUTO" then
+        -- Try common unit frame addons in order
+        local autoFrames = {
+            "ElvUF_Player",
+            "oUF_Unhalted_Player",
+            "UnhaltedPlayer",
+            "SUFUnitplayer",
+            "PlayerFrame"
+        }
+
+        for _, name in ipairs(autoFrames) do
+            local frame = _G[name]
+            if frame and frame:IsShown() then
+                targetFrame = frame
+                break
+            end
+        end
+
+        -- Fallback to PlayerFrame if nothing found
+        if not targetFrame and PlayerFrame then
+            targetFrame = PlayerFrame
+        end
+    else
+        -- Try to find the specified frame
+        targetFrame = _G[frameName]
+    end
+
+    -- Anchor to found frame or fallback to center
+    if targetFrame then
+        combatTimerFrame:SetPoint(
+            settings.anchorPoint,
+            targetFrame,
+            settings.anchorRelativePoint,
+            settings.anchorOffsetX,
+            settings.anchorOffsetY
+        )
+    else
+        -- Fallback: center of screen
+        combatTimerFrame:SetPoint("CENTER", UIParent, "CENTER", 0, -200)
+    end
+end
+
+-- Function to update combat timer appearance
+local function UpdateCombatTimerAppearance()
+    local settings = UsefullStuffDB.combatTimer
+
+    -- Update backdrop
+    combatTimerFrame:SetBackdrop({
+        bgFile = settings.bgTexture,
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = settings.borderSize,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    combatTimerFrame:SetBackdropColor(0, 0, 0, 0.7)
+
+    local borderColor = settings.borderColor
+    combatTimerFrame:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+
+    -- Update font
+    local fontPath = GetFontPath(settings.font)
+    combatTimerText:SetFont(fontPath, settings.fontSize, "OUTLINE")
+end
+
+-- Function to show/hide combat timer
+local function SetCombatTimerVisible(visible)
+    if not UsefullStuffDB.combatTimer.enabled then
+        combatTimerFrame:Hide()
+        return
+    end
+
+    if visible then
+        AnchorCombatTimer()
+        UpdateCombatTimerAppearance()
+        combatTimerFrame:Show()
+    else
+        combatTimerFrame:Hide()
+    end
+end
+
+-- Update timer display
+combatTimerUpdateFrame:SetScript("OnUpdate", function(self, elapsed)
+    if combatTimerFrame:IsShown() then
+        local elapsedTime = GetTime() - combatStartTime
+        local minutes = math.floor(elapsedTime / 60)
+        local seconds = math.floor(elapsedTime % 60)
+        combatTimerText:SetText(string.format("%d:%02d", minutes, seconds))
+    end
+end)
+
+-- Hook into combat events for timer
+combatEventFrame:HookScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_DISABLED" then
+        combatStartTime = GetTime()
+        SetCombatTimerVisible(true)
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        SetCombatTimerVisible(false)
+    end
+end)
+
+-- Auto Combat Logging
+local isLoggingActive = false
+local currentInstanceType = nil
+
+local function StartCombatLogging()
+    if not isLoggingActive then
+        SetCVar("advancedCombatLogging", "1")
+        LoggingCombat(true)
+        isLoggingActive = true
+        print("|cFF00FF00UsefullStuff:|r Combat logging started")
+    end
+end
+
+local function StopCombatLogging()
+    if isLoggingActive then
+        LoggingCombat(false)
+        isLoggingActive = false
+        print("|cFF00FF00UsefullStuff:|r Combat logging stopped")
+    end
+end
+
+local function ShouldLogCurrentContent()
+    local name, instanceType, difficultyID, difficultyName, maxPlayers, dynamicDifficulty, isDynamic, instanceID, instanceGroupSize, lfgDungeonID = GetInstanceInfo()
+
+    if not instanceType or instanceType == "none" then
+        return false
+    end
+
+    local settings = UsefullStuffDB.autoLogging
+
+    -- Mythic+ Dungeons (Challenge Mode)
+    if instanceType == "party" and C_ChallengeMode.IsChallengeModeActive() then
+        return settings.dungeonsMythicPlus
+    end
+
+    -- Raids
+    if instanceType == "raid" then
+        -- 16 = Mythic, 15 = Heroic, 14 = Normal, 17 = LFR
+        if difficultyID == 16 then
+            return settings.raidMythic
+        elseif difficultyID == 15 then
+            return settings.raidHeroic
+        elseif difficultyID == 14 then
+            return settings.raidNormal
+        elseif difficultyID == 17 then
+            return settings.raidFinder
+        end
+    end
+
+    -- Arena
+    if instanceType == "arena" then
+        return settings.arena
+    end
+
+    -- Scenarios
+    if instanceType == "scenario" then
+        return settings.scenarios
+    end
+
+    return false
+end
+
+local function CheckAndUpdateLogging()
+    if ShouldLogCurrentContent() then
+        StartCombatLogging()
+        currentInstanceType = select(2, GetInstanceInfo())
+    else
+        if currentInstanceType then
+            StopCombatLogging()
+            currentInstanceType = nil
+        end
+    end
+end
+
+-- Auto Logging Event Handler
+local autoLoggingFrame = CreateFrame("Frame")
+autoLoggingFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+autoLoggingFrame:RegisterEvent("CHALLENGE_MODE_START")
+autoLoggingFrame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+autoLoggingFrame:RegisterEvent("ENCOUNTER_START")
+autoLoggingFrame:RegisterEvent("ENCOUNTER_END")
+autoLoggingFrame:SetScript("OnEvent", function(self, event)
+    CheckAndUpdateLogging()
+end)
+
 -- Create settings panel
 local function CreateSettingsPanel()
     local panel = CreateFrame("Frame", "UsefullStuffOptionsPanel", UIParent)
@@ -498,6 +772,34 @@ local function CreateSettingsPanel()
 
     tab4:SetScript("OnClick", function() SelectTab(4) end)
     table.insert(tabs, tab4)
+
+    -- Tab 5: Combat Timer
+    local tab5 = CreateFrame("Button", "UsefullStuffTab5", panel)
+    tab5:SetSize(100, 32)
+    tab5:SetPoint("LEFT", tab4, "RIGHT", -15, 0)
+    tab5:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
+    tab5:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+
+    local tab5Text = tab5:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    tab5Text:SetPoint("CENTER", 0, -2)
+    tab5Text:SetText("Combat Timer")
+
+    tab5:SetScript("OnClick", function() SelectTab(5) end)
+    table.insert(tabs, tab5)
+
+    -- Tab 6: Auto Logging
+    local tab6 = CreateFrame("Button", "UsefullStuffTab6", panel)
+    tab6:SetSize(100, 32)
+    tab6:SetPoint("LEFT", tab5, "RIGHT", -15, 0)
+    tab6:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
+    tab6:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+
+    local tab6Text = tab6:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    tab6Text:SetPoint("CENTER", 0, -2)
+    tab6Text:SetText("Auto Logging")
+
+    tab6:SetScript("OnClick", function() SelectTab(6) end)
+    table.insert(tabs, tab6)
 
     -- Panel 1: General Settings
     local generalPanel = CreateFrame("Frame", nil, panel)
@@ -827,6 +1129,431 @@ local function CreateSettingsPanel()
         lastCheckbox = checkbox
     end
 
+    -- Panel 5: Combat Timer Settings
+    local combatTimerPanel = CreateFrame("Frame", nil, panel)
+    combatTimerPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
+    combatTimerPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
+    combatTimerPanel:Hide()
+    table.insert(tabPanels, combatTimerPanel)
+
+    local ctTitle = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    ctTitle:SetPoint("TOPLEFT", 0, 0)
+    ctTitle:SetText("Combat Timer")
+
+    local ctDesc = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    ctDesc:SetPoint("TOPLEFT", ctTitle, "BOTTOMLEFT", 0, -5)
+    ctDesc:SetText("Shows a timer during combat. Auto-anchors to PlayerFrame, SUF, or ElvUI")
+
+    -- Enable Combat Timer Checkbox
+    local enableCTCheckbox = CreateFrame("CheckButton", "UsefullStuffEnableCTCheckbox", combatTimerPanel, "UICheckButtonTemplate")
+    enableCTCheckbox:SetPoint("TOPLEFT", ctDesc, "BOTTOMLEFT", 0, -15)
+    enableCTCheckbox:SetSize(24, 24)
+    enableCTCheckbox:SetChecked(UsefullStuffDB.combatTimer.enabled)
+
+    local enableCTLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableCTLabel:SetPoint("LEFT", enableCTCheckbox, "RIGHT", 5, 0)
+    enableCTLabel:SetText("Enable Combat Timer")
+
+    enableCTCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.combatTimer.enabled = self:GetChecked()
+    end)
+
+    -- Border Size Slider
+    local borderSizeSlider = CreateFrame("Slider", "UsefullStuffCTBorderSizeSlider", combatTimerPanel, "OptionsSliderTemplate")
+    borderSizeSlider:SetPoint("TOPLEFT", enableCTCheckbox, "BOTTOMLEFT", 0, -30)
+    borderSizeSlider:SetMinMaxValues(1, 5)
+    borderSizeSlider:SetValue(UsefullStuffDB.combatTimer.borderSize)
+    borderSizeSlider:SetValueStep(1)
+    borderSizeSlider:SetObeyStepOnDrag(true)
+    borderSizeSlider:SetWidth(200)
+    _G[borderSizeSlider:GetName() .. "Low"]:SetText("1")
+    _G[borderSizeSlider:GetName() .. "High"]:SetText("5")
+    _G[borderSizeSlider:GetName() .. "Text"]:SetText("Border Size: " .. UsefullStuffDB.combatTimer.borderSize)
+    borderSizeSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value)
+        UsefullStuffDB.combatTimer.borderSize = value
+        _G[self:GetName() .. "Text"]:SetText("Border Size: " .. value)
+        UpdateCombatTimerAppearance()
+    end)
+
+    -- Font Size Slider
+    local ctFontSizeSlider = CreateFrame("Slider", "UsefullStuffCTFontSizeSlider", combatTimerPanel, "OptionsSliderTemplate")
+    ctFontSizeSlider:SetPoint("TOPLEFT", borderSizeSlider, "BOTTOMLEFT", 0, -40)
+    ctFontSizeSlider:SetMinMaxValues(10, 32)
+    ctFontSizeSlider:SetValue(UsefullStuffDB.combatTimer.fontSize)
+    ctFontSizeSlider:SetValueStep(2)
+    ctFontSizeSlider:SetObeyStepOnDrag(true)
+    ctFontSizeSlider:SetWidth(200)
+    _G[ctFontSizeSlider:GetName() .. "Low"]:SetText("10")
+    _G[ctFontSizeSlider:GetName() .. "High"]:SetText("32")
+    _G[ctFontSizeSlider:GetName() .. "Text"]:SetText("Font Size: " .. UsefullStuffDB.combatTimer.fontSize)
+    ctFontSizeSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 2) * 2
+        UsefullStuffDB.combatTimer.fontSize = value
+        _G[self:GetName() .. "Text"]:SetText("Font Size: " .. value)
+        UpdateCombatTimerAppearance()
+    end)
+
+    -- Font Dropdown
+    local ctFontLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctFontLabel:SetPoint("TOPLEFT", ctFontSizeSlider, "BOTTOMLEFT", 0, -40)
+    ctFontLabel:SetText("Font:")
+
+    local ctFontDropdown = CreateFrame("Frame", "UsefullStuffCTFontDropdown", combatTimerPanel, "UIDropDownMenuTemplate")
+    ctFontDropdown:SetPoint("TOPLEFT", ctFontLabel, "BOTTOMLEFT", -15, -5)
+
+    UIDropDownMenu_SetWidth(ctFontDropdown, 150)
+    UIDropDownMenu_Initialize(ctFontDropdown, function(self, level)
+        local fonts = {}
+        if LSM then
+            for _, fontName in pairs(LSM:List("font")) do
+                table.insert(fonts, fontName)
+            end
+            table.sort(fonts)
+        else
+            fonts = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
+        end
+
+        for i, fontName in ipairs(fonts) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = fontName
+            info.func = function()
+                UsefullStuffDB.combatTimer.font = fontName
+                UIDropDownMenu_SetText(ctFontDropdown, fontName)
+                UpdateCombatTimerAppearance()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+
+    UIDropDownMenu_SetText(ctFontDropdown, UsefullStuffDB.combatTimer.font)
+
+    -- Background Texture Dropdown
+    local ctBgLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctBgLabel:SetPoint("TOPLEFT", ctFontDropdown, "BOTTOMLEFT", 15, -30)
+    ctBgLabel:SetText("Background Texture:")
+
+    local ctBgDropdown = CreateFrame("Frame", "UsefullStuffCTBgDropdown", combatTimerPanel, "UIDropDownMenuTemplate")
+    ctBgDropdown:SetPoint("TOPLEFT", ctBgLabel, "BOTTOMLEFT", -15, -5)
+
+    local bgTextures = {
+        {name = "Dialog Box", path = "Interface\\DialogFrame\\UI-DialogBox-Background"},
+        {name = "Tooltip", path = "Interface\\Tooltips\\UI-Tooltip-Background"},
+        {name = "Solid Black", path = "Interface\\Buttons\\WHITE8X8"},
+        {name = "Chat Background", path = "Interface\\ChatFrame\\ChatFrameBackground"},
+    }
+
+    UIDropDownMenu_SetWidth(ctBgDropdown, 150)
+    UIDropDownMenu_Initialize(ctBgDropdown, function(self, level)
+        for i, texture in ipairs(bgTextures) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = texture.name
+            info.func = function()
+                UsefullStuffDB.combatTimer.bgTexture = texture.path
+                UIDropDownMenu_SetText(ctBgDropdown, texture.name)
+                UpdateCombatTimerAppearance()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+
+    -- Set initial dropdown text
+    local currentTextureName = "Dialog Box"
+    for i, texture in ipairs(bgTextures) do
+        if texture.path == UsefullStuffDB.combatTimer.bgTexture then
+            currentTextureName = texture.name
+            break
+        end
+    end
+    UIDropDownMenu_SetText(ctBgDropdown, currentTextureName)
+
+    -- Anchor Frame Name Input
+    local ctFrameLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctFrameLabel:SetPoint("TOPLEFT", ctBgDropdown, "BOTTOMLEFT", 15, -30)
+    ctFrameLabel:SetText("Anchor To Frame:")
+
+    local ctFrameHint = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    ctFrameHint:SetPoint("TOPLEFT", ctFrameLabel, "BOTTOMLEFT", 0, -2)
+    ctFrameHint:SetText("(Use AUTO for auto-detect, or frame name like PlayerFrame, ElvUF_Player, etc.)")
+    ctFrameHint:SetTextColor(0.7, 0.7, 0.7, 1)
+
+    local ctFrameInput = CreateFrame("EditBox", "UsefullStuffCTFrameInput", combatTimerPanel, "InputBoxTemplate")
+    ctFrameInput:SetPoint("TOPLEFT", ctFrameHint, "BOTTOMLEFT", 5, -5)
+    ctFrameInput:SetSize(250, 20)
+    ctFrameInput:SetAutoFocus(false)
+    ctFrameInput:SetText(UsefullStuffDB.combatTimer.anchorFrame)
+    ctFrameInput:SetScript("OnEnterPressed", function(self)
+        UsefullStuffDB.combatTimer.anchorFrame = self:GetText()
+        self:ClearFocus()
+        AnchorCombatTimer()
+    end)
+    ctFrameInput:SetScript("OnEscapePressed", function(self)
+        self:SetText(UsefullStuffDB.combatTimer.anchorFrame)
+        self:ClearFocus()
+    end)
+
+    -- Anchor Point Dropdown
+    local ctPointLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctPointLabel:SetPoint("TOPLEFT", ctFrameInput, "BOTTOMLEFT", -5, -20)
+    ctPointLabel:SetText("Anchor Point:")
+
+    local ctPointDropdown = CreateFrame("Frame", "UsefullStuffCTPointDropdown", combatTimerPanel, "UIDropDownMenuTemplate")
+    ctPointDropdown:SetPoint("TOPLEFT", ctPointLabel, "BOTTOMLEFT", -15, -5)
+
+    local anchorPoints = {"TOP", "BOTTOM", "LEFT", "RIGHT", "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT", "CENTER"}
+
+    UIDropDownMenu_SetWidth(ctPointDropdown, 120)
+    UIDropDownMenu_Initialize(ctPointDropdown, function(self, level)
+        for i, point in ipairs(anchorPoints) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = point
+            info.func = function()
+                UsefullStuffDB.combatTimer.anchorPoint = point
+                UIDropDownMenu_SetText(ctPointDropdown, point)
+                AnchorCombatTimer()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetText(ctPointDropdown, UsefullStuffDB.combatTimer.anchorPoint)
+
+    -- Relative Point Dropdown
+    local ctRelPointLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctRelPointLabel:SetPoint("LEFT", ctPointDropdown, "RIGHT", 10, 2)
+    ctRelPointLabel:SetText("To:")
+
+    local ctRelPointDropdown = CreateFrame("Frame", "UsefullStuffCTRelPointDropdown", combatTimerPanel, "UIDropDownMenuTemplate")
+    ctRelPointDropdown:SetPoint("LEFT", ctRelPointLabel, "RIGHT", -10, -2)
+
+    UIDropDownMenu_SetWidth(ctRelPointDropdown, 120)
+    UIDropDownMenu_Initialize(ctRelPointDropdown, function(self, level)
+        for i, point in ipairs(anchorPoints) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = point
+            info.func = function()
+                UsefullStuffDB.combatTimer.anchorRelativePoint = point
+                UIDropDownMenu_SetText(ctRelPointDropdown, point)
+                AnchorCombatTimer()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetText(ctRelPointDropdown, UsefullStuffDB.combatTimer.anchorRelativePoint)
+
+    -- Offset X Input
+    local ctOffsetXLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctOffsetXLabel:SetPoint("TOPLEFT", ctPointDropdown, "BOTTOMLEFT", 15, -20)
+    ctOffsetXLabel:SetText("Offset X:")
+
+    local ctOffsetXInput = CreateFrame("EditBox", "UsefullStuffCTOffsetXInput", combatTimerPanel, "InputBoxTemplate")
+    ctOffsetXInput:SetPoint("LEFT", ctOffsetXLabel, "RIGHT", 10, 0)
+    ctOffsetXInput:SetSize(60, 20)
+    ctOffsetXInput:SetAutoFocus(false)
+    ctOffsetXInput:SetText(tostring(UsefullStuffDB.combatTimer.anchorOffsetX))
+    ctOffsetXInput:SetScript("OnEnterPressed", function(self)
+        local value = tonumber(self:GetText()) or 0
+        UsefullStuffDB.combatTimer.anchorOffsetX = value
+        self:ClearFocus()
+        AnchorCombatTimer()
+    end)
+    ctOffsetXInput:SetScript("OnEscapePressed", function(self)
+        self:SetText(tostring(UsefullStuffDB.combatTimer.anchorOffsetX))
+        self:ClearFocus()
+    end)
+
+    -- Offset Y Input
+    local ctOffsetYLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctOffsetYLabel:SetPoint("LEFT", ctOffsetXInput, "RIGHT", 20, 0)
+    ctOffsetYLabel:SetText("Y:")
+
+    local ctOffsetYInput = CreateFrame("EditBox", "UsefullStuffCTOffsetYInput", combatTimerPanel, "InputBoxTemplate")
+    ctOffsetYInput:SetPoint("LEFT", ctOffsetYLabel, "RIGHT", 10, 0)
+    ctOffsetYInput:SetSize(60, 20)
+    ctOffsetYInput:SetAutoFocus(false)
+    ctOffsetYInput:SetText(tostring(UsefullStuffDB.combatTimer.anchorOffsetY))
+    ctOffsetYInput:SetScript("OnEnterPressed", function(self)
+        local value = tonumber(self:GetText()) or 0
+        UsefullStuffDB.combatTimer.anchorOffsetY = value
+        self:ClearFocus()
+        AnchorCombatTimer()
+    end)
+    ctOffsetYInput:SetScript("OnEscapePressed", function(self)
+        self:SetText(tostring(UsefullStuffDB.combatTimer.anchorOffsetY))
+        self:ClearFocus()
+    end)
+
+    -- Border Color Picker
+    local ctBorderColorLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ctBorderColorLabel:SetPoint("TOPLEFT", ctOffsetXLabel, "BOTTOMLEFT", -15, -25)
+    ctBorderColorLabel:SetText("Border Color:")
+
+    local ctBorderColorButton = CreateFrame("Button", "UsefullStuffCTBorderColorButton", combatTimerPanel, "UIPanelButtonTemplate")
+    ctBorderColorButton:SetPoint("TOPLEFT", ctBorderColorLabel, "BOTTOMLEFT", 0, -8)
+    ctBorderColorButton:SetSize(120, 25)
+    ctBorderColorButton:SetText("Choose Color")
+    ctBorderColorButton:SetScript("OnClick", function()
+        local color = UsefullStuffDB.combatTimer.borderColor
+        local previousColor = {
+            r = color.r,
+            g = color.g,
+            b = color.b,
+            a = color.a
+        }
+
+        ColorPickerFrame:SetupColorPickerAndShow({
+            swatchFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                local a = ColorPickerFrame:GetColorAlpha()
+                UsefullStuffDB.combatTimer.borderColor.r = r
+                UsefullStuffDB.combatTimer.borderColor.g = g
+                UsefullStuffDB.combatTimer.borderColor.b = b
+                UsefullStuffDB.combatTimer.borderColor.a = a
+                UpdateCombatTimerAppearance()
+            end,
+            opacityFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                local a = ColorPickerFrame:GetColorAlpha()
+                UsefullStuffDB.combatTimer.borderColor.r = r
+                UsefullStuffDB.combatTimer.borderColor.g = g
+                UsefullStuffDB.combatTimer.borderColor.b = b
+                UsefullStuffDB.combatTimer.borderColor.a = a
+                UpdateCombatTimerAppearance()
+            end,
+            cancelFunc = function()
+                UsefullStuffDB.combatTimer.borderColor.r = previousColor.r
+                UsefullStuffDB.combatTimer.borderColor.g = previousColor.g
+                UsefullStuffDB.combatTimer.borderColor.b = previousColor.b
+                UsefullStuffDB.combatTimer.borderColor.a = previousColor.a
+                UpdateCombatTimerAppearance()
+            end,
+            hasOpacity = true,
+            opacity = color.a,
+            r = color.r,
+            g = color.g,
+            b = color.b,
+        })
+    end)
+
+    -- Panel 6: Auto Logging Settings
+    local autoLoggingPanel = CreateFrame("Frame", nil, panel)
+    autoLoggingPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
+    autoLoggingPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
+    autoLoggingPanel:Hide()
+    table.insert(tabPanels, autoLoggingPanel)
+
+    local autoLoggingTitle = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    autoLoggingTitle:SetPoint("TOPLEFT", 0, 0)
+    autoLoggingTitle:SetText("Automatic Combat Logging")
+
+    local autoLoggingDesc = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    autoLoggingDesc:SetPoint("TOPLEFT", autoLoggingTitle, "BOTTOMLEFT", 0, -8)
+    autoLoggingDesc:SetText("Automatically start/stop advanced combat logging when entering/leaving content types:")
+
+    -- Mythic+ Dungeons Checkbox
+    local dungeonsMPlusCheckbox = CreateFrame("CheckButton", "UsefullStuffDungeonsMPlusCheckbox", autoLoggingPanel, "UICheckButtonTemplate")
+    dungeonsMPlusCheckbox:SetPoint("TOPLEFT", autoLoggingDesc, "BOTTOMLEFT", 0, -15)
+    dungeonsMPlusCheckbox:SetSize(24, 24)
+    dungeonsMPlusCheckbox:SetChecked(UsefullStuffDB.autoLogging.dungeonsMythicPlus)
+
+    local dungeonsMPlusLabel = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    dungeonsMPlusLabel:SetPoint("LEFT", dungeonsMPlusCheckbox, "RIGHT", 5, 0)
+    dungeonsMPlusLabel:SetText("Mythic+ Dungeons")
+
+    dungeonsMPlusCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.autoLogging.dungeonsMythicPlus = self:GetChecked()
+        CheckAndUpdateLogging()
+    end)
+
+    -- Raid: Mythic Checkbox
+    local raidMythicCheckbox = CreateFrame("CheckButton", "UsefullStuffRaidMythicCheckbox", autoLoggingPanel, "UICheckButtonTemplate")
+    raidMythicCheckbox:SetPoint("TOPLEFT", dungeonsMPlusCheckbox, "BOTTOMLEFT", 0, -8)
+    raidMythicCheckbox:SetSize(24, 24)
+    raidMythicCheckbox:SetChecked(UsefullStuffDB.autoLogging.raidMythic)
+
+    local raidMythicLabel = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    raidMythicLabel:SetPoint("LEFT", raidMythicCheckbox, "RIGHT", 5, 0)
+    raidMythicLabel:SetText("Raid: Mythic")
+
+    raidMythicCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.autoLogging.raidMythic = self:GetChecked()
+        CheckAndUpdateLogging()
+    end)
+
+    -- Raid: Heroic Checkbox
+    local raidHeroicCheckbox = CreateFrame("CheckButton", "UsefullStuffRaidHeroicCheckbox", autoLoggingPanel, "UICheckButtonTemplate")
+    raidHeroicCheckbox:SetPoint("TOPLEFT", raidMythicCheckbox, "BOTTOMLEFT", 0, -8)
+    raidHeroicCheckbox:SetSize(24, 24)
+    raidHeroicCheckbox:SetChecked(UsefullStuffDB.autoLogging.raidHeroic)
+
+    local raidHeroicLabel = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    raidHeroicLabel:SetPoint("LEFT", raidHeroicCheckbox, "RIGHT", 5, 0)
+    raidHeroicLabel:SetText("Raid: Heroic")
+
+    raidHeroicCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.autoLogging.raidHeroic = self:GetChecked()
+        CheckAndUpdateLogging()
+    end)
+
+    -- Raid: Normal Checkbox
+    local raidNormalCheckbox = CreateFrame("CheckButton", "UsefullStuffRaidNormalCheckbox", autoLoggingPanel, "UICheckButtonTemplate")
+    raidNormalCheckbox:SetPoint("TOPLEFT", raidHeroicCheckbox, "BOTTOMLEFT", 0, -8)
+    raidNormalCheckbox:SetSize(24, 24)
+    raidNormalCheckbox:SetChecked(UsefullStuffDB.autoLogging.raidNormal)
+
+    local raidNormalLabel = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    raidNormalLabel:SetPoint("LEFT", raidNormalCheckbox, "RIGHT", 5, 0)
+    raidNormalLabel:SetText("Raid: Normal")
+
+    raidNormalCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.autoLogging.raidNormal = self:GetChecked()
+        CheckAndUpdateLogging()
+    end)
+
+    -- Raid: Finder Checkbox
+    local raidFinderCheckbox = CreateFrame("CheckButton", "UsefullStuffRaidFinderCheckbox", autoLoggingPanel, "UICheckButtonTemplate")
+    raidFinderCheckbox:SetPoint("TOPLEFT", raidNormalCheckbox, "BOTTOMLEFT", 0, -8)
+    raidFinderCheckbox:SetSize(24, 24)
+    raidFinderCheckbox:SetChecked(UsefullStuffDB.autoLogging.raidFinder)
+
+    local raidFinderLabel = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    raidFinderLabel:SetPoint("LEFT", raidFinderCheckbox, "RIGHT", 5, 0)
+    raidFinderLabel:SetText("Raid: Finder")
+
+    raidFinderCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.autoLogging.raidFinder = self:GetChecked()
+        CheckAndUpdateLogging()
+    end)
+
+    -- Arena Checkbox
+    local arenaCheckbox = CreateFrame("CheckButton", "UsefullStuffArenaCheckbox", autoLoggingPanel, "UICheckButtonTemplate")
+    arenaCheckbox:SetPoint("TOPLEFT", raidFinderCheckbox, "BOTTOMLEFT", 0, -8)
+    arenaCheckbox:SetSize(24, 24)
+    arenaCheckbox:SetChecked(UsefullStuffDB.autoLogging.arena)
+
+    local arenaLabel = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    arenaLabel:SetPoint("LEFT", arenaCheckbox, "RIGHT", 5, 0)
+    arenaLabel:SetText("Arena")
+
+    arenaCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.autoLogging.arena = self:GetChecked()
+        CheckAndUpdateLogging()
+    end)
+
+    -- Scenarios Checkbox
+    local scenariosCheckbox = CreateFrame("CheckButton", "UsefullStuffScenariosCheckbox", autoLoggingPanel, "UICheckButtonTemplate")
+    scenariosCheckbox:SetPoint("TOPLEFT", arenaCheckbox, "BOTTOMLEFT", 0, -8)
+    scenariosCheckbox:SetSize(24, 24)
+    scenariosCheckbox:SetChecked(UsefullStuffDB.autoLogging.scenarios)
+
+    local scenariosLabel = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    scenariosLabel:SetPoint("LEFT", scenariosCheckbox, "RIGHT", 5, 0)
+    scenariosLabel:SetText("Scenarios")
+
+    scenariosCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.autoLogging.scenarios = self:GetChecked()
+        CheckAndUpdateLogging()
+    end)
+
     -- Select first tab by default
     SelectTab(1)
 
@@ -845,6 +1572,8 @@ eventFrame:SetScript("OnEvent", function(self, event)
         ApplyBlizzardCombatTextSetting()
         ApplyBlizzardBagBarSetting()
         ApplyAllActionBarMouseovers()
+        AnchorCombatTimer()
+        UpdateCombatTimerAppearance()
         CreateSettingsPanel()
         print("|cFF00FF00UsefullStuff|r loaded! Right-click for cursor circle. Combat text enabled. Configure in ESC > Options > AddOns > UsefullStuff")
     end
