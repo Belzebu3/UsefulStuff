@@ -55,6 +55,11 @@ local defaults = {
         arena = false,
         scenarios = false,
     },
+    chatFont = {
+        enabled = false,
+        font = "Friz Quadrata TT",
+        fontSize = 14,
+    },
 }
 
 -- Initialize settings
@@ -158,6 +163,18 @@ local function InitializeSettings()
             UsefullStuffDB.autoLogging[logType] = defaultValue
         end
     end
+    if not UsefullStuffDB.chatFont then
+        UsefullStuffDB.chatFont = {}
+    end
+    if UsefullStuffDB.chatFont.enabled == nil then
+        UsefullStuffDB.chatFont.enabled = defaults.chatFont.enabled
+    end
+    if not UsefullStuffDB.chatFont.font then
+        UsefullStuffDB.chatFont.font = defaults.chatFont.font
+    end
+    if not UsefullStuffDB.chatFont.fontSize then
+        UsefullStuffDB.chatFont.fontSize = defaults.chatFont.fontSize
+    end
 end
 
 -- Function to get font path from font name
@@ -236,6 +253,63 @@ local function ApplyBlizzardBagBarSetting()
         if MainMenuBarBackpackButton then
             MainMenuBarBackpackButton:Show()
         end
+    end
+end
+
+-- Helper: apply font face to all FontStrings in a frame tree (keeps original sizes)
+local function ApplyFontToFrame(frame, fontPath)
+    if not frame then return end
+    local regions = {frame:GetRegions()}
+    for _, region in ipairs(regions) do
+        if region and region.GetObjectType and region:GetObjectType() == "FontString" then
+            local _, currentSize, currentFlags = region:GetFont()
+            if currentSize then
+                region:SetFont(fontPath, currentSize, currentFlags)
+            end
+        end
+    end
+    local children = {frame:GetChildren()}
+    for _, child in ipairs(children) do
+        ApplyFontToFrame(child, fontPath)
+    end
+end
+
+-- Function to apply chat font setting
+local function ApplyChatFont()
+    if not UsefullStuffDB.chatFont.enabled then
+        return
+    end
+    local fontPath = GetFontPath(UsefullStuffDB.chatFont.font)
+    local fontSize = UsefullStuffDB.chatFont.fontSize
+
+    -- Chat frames (use selected font size)
+    for i = 1, NUM_CHAT_WINDOWS do
+        local chatFrame = _G["ChatFrame" .. i]
+        if chatFrame then
+            local _, oldSize, flags = chatFrame:GetFont()
+            chatFrame:SetFont(fontPath, fontSize, flags)
+        end
+    end
+
+    -- Objective Tracker
+    if ObjectiveTrackerFrame then
+        ApplyFontToFrame(ObjectiveTrackerFrame, fontPath)
+    end
+end
+
+-- Setup hooks so font reapplies when frames update dynamically
+local chatFontHooksInstalled = false
+local function SetupChatFontHooks()
+    if chatFontHooksInstalled then return end
+    chatFontHooksInstalled = true
+
+    -- Hook objective tracker updates
+    if ObjectiveTrackerFrame and ObjectiveTrackerFrame.Update then
+        hooksecurefunc(ObjectiveTrackerFrame, "Update", function()
+            if UsefullStuffDB.chatFont.enabled then
+                ApplyFontToFrame(ObjectiveTrackerFrame, GetFontPath(UsefullStuffDB.chatFont.font))
+            end
+        end)
     end
 end
 
@@ -820,6 +894,82 @@ local function CreateSettingsPanel()
     disableBagBarCheckbox:SetScript("OnClick", function(self)
         UsefullStuffDB.disableBlizzardBagBar = self:GetChecked()
         ApplyBlizzardBagBarSetting()
+    end)
+
+    -- Chat Font Section
+    local chatFontTitle = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    chatFontTitle:SetPoint("TOPLEFT", disableBagBarCheckbox, "BOTTOMLEFT", 0, -25)
+    chatFontTitle:SetText("Chat Font")
+
+    local chatFontDesc = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    chatFontDesc:SetPoint("TOPLEFT", chatFontTitle, "BOTTOMLEFT", 0, -5)
+    chatFontDesc:SetText("Override the default Blizzard chat font")
+
+    -- Enable Chat Font Checkbox
+    local enableChatFontCheckbox = CreateFrame("CheckButton", "UsefullStuffEnableChatFontCheckbox", generalPanel, "UICheckButtonTemplate")
+    enableChatFontCheckbox:SetPoint("TOPLEFT", chatFontDesc, "BOTTOMLEFT", 0, -10)
+    enableChatFontCheckbox:SetSize(24, 24)
+    enableChatFontCheckbox:SetChecked(UsefullStuffDB.chatFont.enabled)
+
+    local enableChatFontLabel = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableChatFontLabel:SetPoint("LEFT", enableChatFontCheckbox, "RIGHT", 5, 0)
+    enableChatFontLabel:SetText("Enable Custom Chat Font")
+
+    enableChatFontCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.chatFont.enabled = self:GetChecked()
+        ApplyChatFont()
+    end)
+
+    -- Chat Font Dropdown
+    local chatFontLabel = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    chatFontLabel:SetPoint("TOPLEFT", enableChatFontCheckbox, "BOTTOMLEFT", 0, -15)
+    chatFontLabel:SetText("Font:")
+
+    local chatFontDropdown = CreateFrame("Frame", "UsefullStuffChatFontDropdown", generalPanel, "UIDropDownMenuTemplate")
+    chatFontDropdown:SetPoint("TOPLEFT", chatFontLabel, "BOTTOMLEFT", -15, -5)
+
+    UIDropDownMenu_SetWidth(chatFontDropdown, 150)
+    UIDropDownMenu_Initialize(chatFontDropdown, function(self, level)
+        local fonts = {}
+        if LSM then
+            for _, fontName in pairs(LSM:List("font")) do
+                table.insert(fonts, fontName)
+            end
+            table.sort(fonts)
+        else
+            fonts = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
+        end
+
+        for i, fontName in ipairs(fonts) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = fontName
+            info.func = function()
+                UsefullStuffDB.chatFont.font = fontName
+                UIDropDownMenu_SetText(chatFontDropdown, fontName)
+                ApplyChatFont()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+
+    UIDropDownMenu_SetText(chatFontDropdown, UsefullStuffDB.chatFont.font)
+
+    -- Chat Font Size Slider
+    local chatFontSizeSlider = CreateFrame("Slider", "UsefullStuffChatFontSizeSlider", generalPanel, "OptionsSliderTemplate")
+    chatFontSizeSlider:SetPoint("TOPLEFT", chatFontDropdown, "BOTTOMLEFT", 15, -30)
+    chatFontSizeSlider:SetMinMaxValues(8, 32)
+    chatFontSizeSlider:SetValue(UsefullStuffDB.chatFont.fontSize)
+    chatFontSizeSlider:SetValueStep(1)
+    chatFontSizeSlider:SetObeyStepOnDrag(true)
+    chatFontSizeSlider:SetWidth(200)
+    _G[chatFontSizeSlider:GetName() .. "Low"]:SetText("8")
+    _G[chatFontSizeSlider:GetName() .. "High"]:SetText("32")
+    _G[chatFontSizeSlider:GetName() .. "Text"]:SetText("Font Size: " .. UsefullStuffDB.chatFont.fontSize)
+    chatFontSizeSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value)
+        UsefullStuffDB.chatFont.fontSize = value
+        _G[self:GetName() .. "Text"]:SetText("Font Size: " .. value)
+        ApplyChatFont()
     end)
 
     -- Panel 2: Cursor Circle Settings
@@ -1571,6 +1721,8 @@ eventFrame:SetScript("OnEvent", function(self, event)
         BuildCircle()
         ApplyBlizzardCombatTextSetting()
         ApplyBlizzardBagBarSetting()
+        ApplyChatFont()
+        SetupChatFontHooks()
         ApplyAllActionBarMouseovers()
         AnchorCombatTimer()
         UpdateCombatTimerAppearance()
