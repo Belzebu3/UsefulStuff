@@ -71,6 +71,15 @@ local defaults = {
         x = 0,
         y = 150,
     },
+    lustTracker = {
+        enabled = true,
+        iconId = 132313,
+        iconSize = 48,
+        x = 0,
+        y = 250,
+        font = "Friz Quadrata TT",
+        fontSize = 18,
+    },
 }
 
 -- Initialize settings
@@ -215,6 +224,30 @@ local function InitializeSettings()
     end
     if not UsefulStuffDB.gateway.y then
         UsefulStuffDB.gateway.y = defaults.gateway.y
+    end
+    if not UsefulStuffDB.lustTracker then
+        UsefulStuffDB.lustTracker = {}
+    end
+    if UsefulStuffDB.lustTracker.enabled == nil then
+        UsefulStuffDB.lustTracker.enabled = defaults.lustTracker.enabled
+    end
+    if not UsefulStuffDB.lustTracker.iconId then
+        UsefulStuffDB.lustTracker.iconId = defaults.lustTracker.iconId
+    end
+    if not UsefulStuffDB.lustTracker.iconSize then
+        UsefulStuffDB.lustTracker.iconSize = defaults.lustTracker.iconSize
+    end
+    if not UsefulStuffDB.lustTracker.x then
+        UsefulStuffDB.lustTracker.x = defaults.lustTracker.x
+    end
+    if not UsefulStuffDB.lustTracker.y then
+        UsefulStuffDB.lustTracker.y = defaults.lustTracker.y
+    end
+    if not UsefulStuffDB.lustTracker.font then
+        UsefulStuffDB.lustTracker.font = defaults.lustTracker.font
+    end
+    if not UsefulStuffDB.lustTracker.fontSize then
+        UsefulStuffDB.lustTracker.fontSize = defaults.lustTracker.fontSize
     end
 end
 
@@ -880,6 +913,71 @@ local function InitGateway()
     UpdateGatewayDisplay()
 end
 
+-- Lust Tracker
+local lustLastHaste = nil
+local lustExpirationTime = 0
+
+local lustFrame = CreateFrame("Frame", "UsefulStuff_LustTracker", UIParent)
+lustFrame:SetFrameStrata("HIGH")
+lustFrame:Hide()
+
+local lustIcon = lustFrame:CreateTexture(nil, "BACKGROUND")
+lustIcon:SetAllPoints()
+
+local lustTimerText = lustFrame:CreateFontString(nil, "OVERLAY")
+lustTimerText:SetPoint("CENTER", lustFrame, "CENTER", 0, 0)
+lustTimerText:SetJustifyH("CENTER")
+
+local function UpdateLustTrackerAppearance()
+    local settings = UsefulStuffDB.lustTracker
+    local size = settings.iconSize
+    lustFrame:SetSize(size, size)
+    lustFrame:ClearAllPoints()
+    lustFrame:SetPoint("CENTER", UIParent, "CENTER", settings.x, settings.y)
+    lustIcon:SetTexture(settings.iconId)
+    local fontPath = GetFontPath(settings.font)
+    lustTimerText:SetFont(fontPath, settings.fontSize, "OUTLINE")
+end
+
+lustFrame:SetScript("OnUpdate", function(self, elapsed)
+    local remaining = lustExpirationTime - GetTime()
+    if remaining <= 0 then
+        self:Hide()
+        return
+    end
+    lustTimerText:SetText(string.format("%.1f", remaining))
+end)
+
+local lustEventFrame = CreateFrame("Frame")
+lustEventFrame:RegisterEvent("UNIT_SPELL_HASTE")
+lustEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+lustEventFrame:SetScript("OnEvent", function(self, event, ...)
+    if not UsefulStuffDB or not UsefulStuffDB.lustTracker.enabled then
+        lustFrame:Hide()
+        return
+    end
+
+    local now = GetHaste() + 100
+    if not lustLastHaste then
+        lustLastHaste = now
+        return
+    end
+
+    local lustValue = lustLastHaste * 1.3
+    local diff = now - lustValue
+    if diff > -0.2 and diff < 0.2 then
+        lustExpirationTime = GetTime() + 40
+        UpdateLustTrackerAppearance()
+        lustFrame:Show()
+    end
+    lustLastHaste = now
+end)
+
+local function InitLustTracker()
+    lustLastHaste = GetHaste() + 100
+    UpdateLustTrackerAppearance()
+end
+
 -- Create settings panel
 local function CreateSettingsPanel()
     local panel = CreateFrame("Frame", "UsefulStuffOptionsPanel", UIParent)
@@ -1002,6 +1100,20 @@ local function CreateSettingsPanel()
 
     tab7:SetScript("OnClick", function() SelectTab(7) end)
     table.insert(tabs, tab7)
+
+    -- Tab 8: Lust Tracker
+    local tab8 = CreateFrame("Button", "UsefulStuffTab8", panel)
+    tab8:SetSize(100, 32)
+    tab8:SetPoint("LEFT", tab7, "RIGHT", -15, 0)
+    tab8:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
+    tab8:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+
+    local tab8Text = tab8:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    tab8Text:SetPoint("CENTER", 0, -2)
+    tab8Text:SetText("Lust Tracker")
+
+    tab8:SetScript("OnClick", function() SelectTab(8) end)
+    table.insert(tabs, tab8)
 
     -- Panel 1: General Settings
     local generalPanel = CreateFrame("Frame", nil, panel)
@@ -2018,6 +2130,165 @@ local function CreateSettingsPanel()
         UpdateGatewayDisplay()
     end)
 
+    -- Panel 8: Lust Tracker Settings
+    local lustPanel = CreateFrame("Frame", nil, panel)
+    lustPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
+    lustPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
+    lustPanel:Hide()
+    table.insert(tabPanels, lustPanel)
+
+    local ltTitle = lustPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    ltTitle:SetPoint("TOPLEFT", 0, 0)
+    ltTitle:SetText("Lust Tracker")
+
+    local ltDesc = lustPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    ltDesc:SetPoint("TOPLEFT", ltTitle, "BOTTOMLEFT", 0, -5)
+    ltDesc:SetText("Displays an icon with countdown when Bloodlust/Heroism/Time Warp is detected")
+
+    -- Enable Lust Tracker Checkbox
+    local enableLTCheckbox = CreateFrame("CheckButton", "UsefulStuffEnableLTCheckbox", lustPanel, "UICheckButtonTemplate")
+    enableLTCheckbox:SetPoint("TOPLEFT", ltDesc, "BOTTOMLEFT", 0, -15)
+    enableLTCheckbox:SetSize(24, 24)
+    enableLTCheckbox:SetChecked(UsefulStuffDB.lustTracker.enabled)
+
+    local enableLTLabel = lustPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableLTLabel:SetPoint("LEFT", enableLTCheckbox, "RIGHT", 5, 0)
+    enableLTLabel:SetText("Enable Lust Tracker")
+
+    enableLTCheckbox:SetScript("OnClick", function(self)
+        UsefulStuffDB.lustTracker.enabled = self:GetChecked()
+        if not self:GetChecked() then
+            lustFrame:Hide()
+        end
+    end)
+
+    -- Icon ID Input
+    local ltIconLabel = lustPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ltIconLabel:SetPoint("TOPLEFT", enableLTCheckbox, "BOTTOMLEFT", 0, -15)
+    ltIconLabel:SetText("Icon ID:")
+
+    local ltIconInput = CreateFrame("EditBox", "UsefulStuffLTIconInput", lustPanel, "InputBoxTemplate")
+    ltIconInput:SetPoint("LEFT", ltIconLabel, "RIGHT", 10, 0)
+    ltIconInput:SetSize(80, 20)
+    ltIconInput:SetAutoFocus(false)
+    ltIconInput:SetText(tostring(UsefulStuffDB.lustTracker.iconId))
+    ltIconInput:SetScript("OnEnterPressed", function(self)
+        local value = tonumber(self:GetText()) or defaults.lustTracker.iconId
+        UsefulStuffDB.lustTracker.iconId = value
+        self:ClearFocus()
+        UpdateLustTrackerAppearance()
+    end)
+    ltIconInput:SetScript("OnEscapePressed", function(self)
+        self:SetText(tostring(UsefulStuffDB.lustTracker.iconId))
+        self:ClearFocus()
+    end)
+
+    -- Icon Size Slider
+    local ltSizeSlider = CreateFrame("Slider", "UsefulStuffLTSizeSlider", lustPanel, "OptionsSliderTemplate")
+    ltSizeSlider:SetPoint("TOPLEFT", ltIconLabel, "BOTTOMLEFT", 0, -30)
+    ltSizeSlider:SetMinMaxValues(24, 96)
+    ltSizeSlider:SetValue(UsefulStuffDB.lustTracker.iconSize)
+    ltSizeSlider:SetValueStep(4)
+    ltSizeSlider:SetObeyStepOnDrag(true)
+    ltSizeSlider:SetWidth(200)
+    _G[ltSizeSlider:GetName() .. "Low"]:SetText("24")
+    _G[ltSizeSlider:GetName() .. "High"]:SetText("96")
+    _G[ltSizeSlider:GetName() .. "Text"]:SetText("Icon Size: " .. UsefulStuffDB.lustTracker.iconSize)
+    ltSizeSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 4) * 4
+        UsefulStuffDB.lustTracker.iconSize = value
+        _G[self:GetName() .. "Text"]:SetText("Icon Size: " .. value)
+        UpdateLustTrackerAppearance()
+    end)
+
+    -- Font Dropdown
+    local ltFontLabel = lustPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    ltFontLabel:SetPoint("TOPLEFT", ltSizeSlider, "BOTTOMLEFT", 0, -40)
+    ltFontLabel:SetText("Font:")
+
+    local ltFontDropdown = CreateFrame("Frame", "UsefulStuffLTFontDropdown", lustPanel, "UIDropDownMenuTemplate")
+    ltFontDropdown:SetPoint("TOPLEFT", ltFontLabel, "BOTTOMLEFT", -15, -5)
+
+    UIDropDownMenu_SetWidth(ltFontDropdown, 150)
+    UIDropDownMenu_Initialize(ltFontDropdown, function(self, level)
+        local fonts = {}
+        if LSM then
+            for _, fontName in pairs(LSM:List("font")) do
+                table.insert(fonts, fontName)
+            end
+            table.sort(fonts)
+        else
+            fonts = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
+        end
+
+        for i, fontName in ipairs(fonts) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = fontName
+            info.func = function()
+                UsefulStuffDB.lustTracker.font = fontName
+                UIDropDownMenu_SetText(ltFontDropdown, fontName)
+                UpdateLustTrackerAppearance()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+
+    UIDropDownMenu_SetText(ltFontDropdown, UsefulStuffDB.lustTracker.font)
+
+    -- Font Size Slider
+    local ltFontSizeSlider = CreateFrame("Slider", "UsefulStuffLTFontSizeSlider", lustPanel, "OptionsSliderTemplate")
+    ltFontSizeSlider:SetPoint("TOPLEFT", ltFontDropdown, "BOTTOMLEFT", 15, -30)
+    ltFontSizeSlider:SetMinMaxValues(10, 48)
+    ltFontSizeSlider:SetValue(UsefulStuffDB.lustTracker.fontSize)
+    ltFontSizeSlider:SetValueStep(2)
+    ltFontSizeSlider:SetObeyStepOnDrag(true)
+    ltFontSizeSlider:SetWidth(200)
+    _G[ltFontSizeSlider:GetName() .. "Low"]:SetText("10")
+    _G[ltFontSizeSlider:GetName() .. "High"]:SetText("48")
+    _G[ltFontSizeSlider:GetName() .. "Text"]:SetText("Font Size: " .. UsefulStuffDB.lustTracker.fontSize)
+    ltFontSizeSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 2) * 2
+        UsefulStuffDB.lustTracker.fontSize = value
+        _G[self:GetName() .. "Text"]:SetText("Font Size: " .. value)
+        UpdateLustTrackerAppearance()
+    end)
+
+    -- Position X Slider
+    local ltPosXSlider = CreateFrame("Slider", "UsefulStuffLTPosXSlider", lustPanel, "OptionsSliderTemplate")
+    ltPosXSlider:SetPoint("TOPLEFT", ltFontSizeSlider, "BOTTOMLEFT", 0, -40)
+    ltPosXSlider:SetMinMaxValues(-500, 500)
+    ltPosXSlider:SetValue(UsefulStuffDB.lustTracker.x)
+    ltPosXSlider:SetValueStep(10)
+    ltPosXSlider:SetObeyStepOnDrag(true)
+    ltPosXSlider:SetWidth(200)
+    _G[ltPosXSlider:GetName() .. "Low"]:SetText("-500")
+    _G[ltPosXSlider:GetName() .. "High"]:SetText("500")
+    _G[ltPosXSlider:GetName() .. "Text"]:SetText("Position X: " .. UsefulStuffDB.lustTracker.x)
+    ltPosXSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 10) * 10
+        UsefulStuffDB.lustTracker.x = value
+        _G[self:GetName() .. "Text"]:SetText("Position X: " .. value)
+        UpdateLustTrackerAppearance()
+    end)
+
+    -- Position Y Slider
+    local ltPosYSlider = CreateFrame("Slider", "UsefulStuffLTPosYSlider", lustPanel, "OptionsSliderTemplate")
+    ltPosYSlider:SetPoint("TOPLEFT", ltPosXSlider, "BOTTOMLEFT", 0, -40)
+    ltPosYSlider:SetMinMaxValues(-500, 500)
+    ltPosYSlider:SetValue(UsefulStuffDB.lustTracker.y)
+    ltPosYSlider:SetValueStep(10)
+    ltPosYSlider:SetObeyStepOnDrag(true)
+    ltPosYSlider:SetWidth(200)
+    _G[ltPosYSlider:GetName() .. "Low"]:SetText("-500")
+    _G[ltPosYSlider:GetName() .. "High"]:SetText("500")
+    _G[ltPosYSlider:GetName() .. "Text"]:SetText("Position Y: " .. UsefulStuffDB.lustTracker.y)
+    ltPosYSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 10) * 10
+        UsefulStuffDB.lustTracker.y = value
+        _G[self:GetName() .. "Text"]:SetText("Position Y: " .. value)
+        UpdateLustTrackerAppearance()
+    end)
+
     -- Select first tab by default
     SelectTab(1)
 
@@ -2041,6 +2312,7 @@ eventFrame:SetScript("OnEvent", function(self, event)
         AnchorCombatTimer()
         UpdateCombatTimerAppearance()
         InitGateway()
+        InitLustTracker()
         CreateSettingsPanel()
         print("|cFF00FF00UsefulStuff|r loaded! Configure in ESC > Options > AddOns > UsefulStuff")
     end

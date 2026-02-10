@@ -31,6 +31,11 @@ Useful UI enhancements for World of Warcraft.
 - Displays a warning if the spell is not on any action bar
 - Customizable text, font, size, and position
 
+### Lust Tracker
+- Detects Bloodlust/Heroism/Time Warp via haste change
+- Displays an icon with remaining time countdown
+- Configurable icon, size, font, and position
+
 ### Chat Font
 - Override the default Blizzard chat font
 - Applies to chat frames and objective tracker
