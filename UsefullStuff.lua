@@ -1771,6 +1771,6 @@ eventFrame:SetScript("OnEvent", function(self, event)
         AnchorCombatTimer()
         UpdateCombatTimerAppearance()
         CreateSettingsPanel()
-        print("|cFF00FF00UsefullStuff|r loaded! Right-click for cursor circle. Combat text enabled. Configure in ESC > Options > AddOns > UsefullStuff")
+        print("|cFF00FF00UsefullStuff|r loaded! Configure in ESC > Options > AddOns > UsefullStuff")
     end
 end)
