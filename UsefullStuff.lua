@@ -13,9 +13,11 @@ end
 
 -- Default settings
 local defaults = {
+    cursorCircleEnabled = true,
     circleRadius = 20,
     circleColor = {r = 1, g = 1, b = 1, a = 0.8},
     lineThickness = 3,
+    combatTextEnabled = true,
     combatTextEnter = "ENTERING COMBAT!",
     combatTextLeave = "Leaving Combat",
     combatTextFont = "Friz Quadrata TT",
@@ -67,6 +69,9 @@ local function InitializeSettings()
     if not UsefullStuffDB then
         UsefullStuffDB = {}
     end
+    if UsefullStuffDB.cursorCircleEnabled == nil then
+        UsefullStuffDB.cursorCircleEnabled = defaults.cursorCircleEnabled
+    end
     if not UsefullStuffDB.circleRadius then
         UsefullStuffDB.circleRadius = defaults.circleRadius
     end
@@ -75,6 +80,9 @@ local function InitializeSettings()
     end
     if not UsefullStuffDB.lineThickness then
         UsefullStuffDB.lineThickness = defaults.lineThickness
+    end
+    if UsefullStuffDB.combatTextEnabled == nil then
+        UsefullStuffDB.combatTextEnabled = defaults.combatTextEnabled
     end
     if not UsefullStuffDB.combatTextEnter then
         UsefullStuffDB.combatTextEnter = defaults.combatTextEnter
@@ -483,6 +491,13 @@ end)
 
 -- Mouse button detection
 local function CheckMouseButton()
+    if not UsefullStuffDB or not UsefullStuffDB.cursorCircleEnabled then
+        if isRightMouseDown then
+            isRightMouseDown = false
+            circleFrame:Hide()
+        end
+        return
+    end
     if IsMouseButtonDown("RightButton") then
         if not isRightMouseDown then
             isRightMouseDown = true
@@ -532,6 +547,7 @@ end)
 
 -- Function to show combat text
 local function ShowCombatText(text)
+    if not UsefullStuffDB.combatTextEnabled then return end
     combatTextFrame:ClearAllPoints()
     combatTextFrame:SetPoint("CENTER", UIParent, "CENTER", UsefullStuffDB.combatTextX, UsefullStuffDB.combatTextY)
 
@@ -979,9 +995,23 @@ local function CreateSettingsPanel()
     circlePanel:Hide()
     table.insert(tabPanels, circlePanel)
 
+    -- Enable Cursor Circle Checkbox
+    local enableCircleCheckbox = CreateFrame("CheckButton", "UsefullStuffEnableCircleCheckbox", circlePanel, "UICheckButtonTemplate")
+    enableCircleCheckbox:SetPoint("TOPLEFT", 0, -10)
+    enableCircleCheckbox:SetSize(24, 24)
+    enableCircleCheckbox:SetChecked(UsefullStuffDB.cursorCircleEnabled)
+
+    local enableCircleLabel = circlePanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableCircleLabel:SetPoint("LEFT", enableCircleCheckbox, "RIGHT", 5, 0)
+    enableCircleLabel:SetText("Enable Cursor Circle")
+
+    enableCircleCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.cursorCircleEnabled = self:GetChecked()
+    end)
+
     -- Circle Size Slider
     local sizeSlider = CreateFrame("Slider", "UsefullStuffSizeSlider", circlePanel, "OptionsSliderTemplate")
-    sizeSlider:SetPoint("TOPLEFT", 0, -10)
+    sizeSlider:SetPoint("TOPLEFT", enableCircleCheckbox, "BOTTOMLEFT", 0, -30)
     sizeSlider:SetMinMaxValues(20, 150)
     sizeSlider:SetValue(UsefullStuffDB.circleRadius)
     sizeSlider:SetValueStep(5)
@@ -1074,9 +1104,23 @@ local function CreateSettingsPanel()
     combatPanel:Hide()
     table.insert(tabPanels, combatPanel)
 
+    -- Enable Combat Text Checkbox
+    local enableCombatTextCheckbox = CreateFrame("CheckButton", "UsefullStuffEnableCombatTextCheckbox", combatPanel, "UICheckButtonTemplate")
+    enableCombatTextCheckbox:SetPoint("TOPLEFT", 0, -10)
+    enableCombatTextCheckbox:SetSize(24, 24)
+    enableCombatTextCheckbox:SetChecked(UsefullStuffDB.combatTextEnabled)
+
+    local enableCombatTextLabel = combatPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableCombatTextLabel:SetPoint("LEFT", enableCombatTextCheckbox, "RIGHT", 5, 0)
+    enableCombatTextLabel:SetText("Enable Combat Text")
+
+    enableCombatTextCheckbox:SetScript("OnClick", function(self)
+        UsefullStuffDB.combatTextEnabled = self:GetChecked()
+    end)
+
     -- Enter Combat Text
     local enterTextLabel = combatPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    enterTextLabel:SetPoint("TOPLEFT", 0, -10)
+    enterTextLabel:SetPoint("TOPLEFT", enableCombatTextCheckbox, "BOTTOMLEFT", 0, -15)
     enterTextLabel:SetText("Enter Combat Text:")
 
     local enterTextBox = CreateFrame("EditBox", "UsefullStuffEnterTextBox", combatPanel, "InputBoxTemplate")
