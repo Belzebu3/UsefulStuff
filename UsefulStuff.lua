@@ -62,6 +62,15 @@ local defaults = {
         font = "Friz Quadrata TT",
         fontSize = 14,
     },
+    gateway = {
+        enabled = true,
+        text = "Gateway usable.",
+        missingText = "Gateway Control Shard is missing",
+        font = "Friz Quadrata TT",
+        fontSize = 24,
+        x = 0,
+        y = 150,
+    },
 }
 
 -- Initialize settings
@@ -182,6 +191,30 @@ local function InitializeSettings()
     end
     if not UsefulStuffDB.chatFont.fontSize then
         UsefulStuffDB.chatFont.fontSize = defaults.chatFont.fontSize
+    end
+    if not UsefulStuffDB.gateway then
+        UsefulStuffDB.gateway = {}
+    end
+    if UsefulStuffDB.gateway.enabled == nil then
+        UsefulStuffDB.gateway.enabled = defaults.gateway.enabled
+    end
+    if not UsefulStuffDB.gateway.text then
+        UsefulStuffDB.gateway.text = defaults.gateway.text
+    end
+    if not UsefulStuffDB.gateway.missingText then
+        UsefulStuffDB.gateway.missingText = defaults.gateway.missingText
+    end
+    if not UsefulStuffDB.gateway.font then
+        UsefulStuffDB.gateway.font = defaults.gateway.font
+    end
+    if not UsefulStuffDB.gateway.fontSize then
+        UsefulStuffDB.gateway.fontSize = defaults.gateway.fontSize
+    end
+    if not UsefulStuffDB.gateway.x then
+        UsefulStuffDB.gateway.x = defaults.gateway.x
+    end
+    if not UsefulStuffDB.gateway.y then
+        UsefulStuffDB.gateway.y = defaults.gateway.y
     end
 end
 
@@ -782,6 +815,71 @@ autoLoggingFrame:SetScript("OnEvent", function(self, event)
     CheckAndUpdateLogging()
 end)
 
+-- Gateway Control Shard Detection
+local GATEWAY_SPELL_ID = 188152
+local gatewayActionId = nil
+
+local gatewayFrame = CreateFrame("Frame", "UsefulStuff_GatewayText", UIParent)
+gatewayFrame:SetSize(400, 50)
+gatewayFrame:SetFrameStrata("HIGH")
+gatewayFrame:Hide()
+
+local gatewayText = gatewayFrame:CreateFontString(nil, "OVERLAY")
+gatewayText:SetPoint("CENTER")
+gatewayText:SetJustifyH("CENTER")
+
+local function GetGatewayActionId()
+    for i = 1, 200 do
+        local actionType, id = GetActionInfo(i)
+        if id == GATEWAY_SPELL_ID then
+            gatewayActionId = i
+            return
+        end
+    end
+    gatewayActionId = nil
+end
+
+local function UpdateGatewayDisplay()
+    if not UsefulStuffDB or not UsefulStuffDB.gateway.enabled then
+        gatewayFrame:Hide()
+        return
+    end
+
+    local settings = UsefulStuffDB.gateway
+    local fontPath = GetFontPath(settings.font)
+    gatewayText:SetFont(fontPath, settings.fontSize, "OUTLINE")
+
+    gatewayFrame:ClearAllPoints()
+    gatewayFrame:SetPoint("CENTER", UIParent, "CENTER", settings.x, settings.y)
+
+    if gatewayActionId == nil then
+        gatewayText:SetText(settings.missingText)
+        gatewayText:SetTextColor(1, 0.3, 0.3, 1)
+        gatewayFrame:Show()
+    elseif IsUsableAction(gatewayActionId) then
+        gatewayText:SetText(settings.text)
+        gatewayText:SetTextColor(0, 1, 0, 1)
+        gatewayFrame:Show()
+    else
+        gatewayFrame:Hide()
+    end
+end
+
+local gatewayEventFrame = CreateFrame("Frame")
+gatewayEventFrame:RegisterEvent("ACTIONBAR_UPDATE_USABLE")
+gatewayEventFrame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+gatewayEventFrame:SetScript("OnEvent", function(self, event)
+    if event == "ACTIONBAR_SLOT_CHANGED" then
+        GetGatewayActionId()
+    end
+    UpdateGatewayDisplay()
+end)
+
+local function InitGateway()
+    GetGatewayActionId()
+    UpdateGatewayDisplay()
+end
+
 -- Create settings panel
 local function CreateSettingsPanel()
     local panel = CreateFrame("Frame", "UsefulStuffOptionsPanel", UIParent)
@@ -890,6 +988,20 @@ local function CreateSettingsPanel()
 
     tab6:SetScript("OnClick", function() SelectTab(6) end)
     table.insert(tabs, tab6)
+
+    -- Tab 7: Gateway
+    local tab7 = CreateFrame("Button", "UsefulStuffTab7", panel)
+    tab7:SetSize(100, 32)
+    tab7:SetPoint("LEFT", tab6, "RIGHT", -15, 0)
+    tab7:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
+    tab7:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+
+    local tab7Text = tab7:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    tab7Text:SetPoint("CENTER", 0, -2)
+    tab7Text:SetText("Gateway")
+
+    tab7:SetScript("OnClick", function() SelectTab(7) end)
+    table.insert(tabs, tab7)
 
     -- Panel 1: General Settings
     local generalPanel = CreateFrame("Frame", nil, panel)
@@ -1748,6 +1860,164 @@ local function CreateSettingsPanel()
         CheckAndUpdateLogging()
     end)
 
+    -- Panel 7: Gateway Settings
+    local gatewayPanel = CreateFrame("Frame", nil, panel)
+    gatewayPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
+    gatewayPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
+    gatewayPanel:Hide()
+    table.insert(tabPanels, gatewayPanel)
+
+    local gwTitle = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    gwTitle:SetPoint("TOPLEFT", 0, 0)
+    gwTitle:SetText("Gateway Control Shard")
+
+    local gwDesc = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    gwDesc:SetPoint("TOPLEFT", gwTitle, "BOTTOMLEFT", 0, -5)
+    gwDesc:SetText("Shows a notification when Gateway Control Shard (spell 188152) is usable")
+
+    -- Enable Gateway Checkbox
+    local enableGWCheckbox = CreateFrame("CheckButton", "UsefulStuffEnableGWCheckbox", gatewayPanel, "UICheckButtonTemplate")
+    enableGWCheckbox:SetPoint("TOPLEFT", gwDesc, "BOTTOMLEFT", 0, -15)
+    enableGWCheckbox:SetSize(24, 24)
+    enableGWCheckbox:SetChecked(UsefulStuffDB.gateway.enabled)
+
+    local enableGWLabel = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableGWLabel:SetPoint("LEFT", enableGWCheckbox, "RIGHT", 5, 0)
+    enableGWLabel:SetText("Enable Gateway Notification")
+
+    enableGWCheckbox:SetScript("OnClick", function(self)
+        UsefulStuffDB.gateway.enabled = self:GetChecked()
+        UpdateGatewayDisplay()
+    end)
+
+    -- Gateway Usable Text
+    local gwTextLabel = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    gwTextLabel:SetPoint("TOPLEFT", enableGWCheckbox, "BOTTOMLEFT", 0, -15)
+    gwTextLabel:SetText("Usable Text:")
+
+    local gwTextBox = CreateFrame("EditBox", "UsefulStuffGWTextBox", gatewayPanel, "InputBoxTemplate")
+    gwTextBox:SetPoint("TOPLEFT", gwTextLabel, "BOTTOMLEFT", 5, -5)
+    gwTextBox:SetSize(200, 20)
+    gwTextBox:SetAutoFocus(false)
+    gwTextBox:SetText(UsefulStuffDB.gateway.text)
+    gwTextBox:SetScript("OnEnterPressed", function(self)
+        UsefulStuffDB.gateway.text = self:GetText()
+        self:ClearFocus()
+        UpdateGatewayDisplay()
+    end)
+    gwTextBox:SetScript("OnEscapePressed", function(self)
+        self:SetText(UsefulStuffDB.gateway.text)
+        self:ClearFocus()
+    end)
+
+    -- Gateway Missing Text
+    local gwMissingLabel = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    gwMissingLabel:SetPoint("TOPLEFT", gwTextBox, "BOTTOMLEFT", -5, -15)
+    gwMissingLabel:SetText("Missing Text:")
+
+    local gwMissingBox = CreateFrame("EditBox", "UsefulStuffGWMissingBox", gatewayPanel, "InputBoxTemplate")
+    gwMissingBox:SetPoint("TOPLEFT", gwMissingLabel, "BOTTOMLEFT", 5, -5)
+    gwMissingBox:SetSize(200, 20)
+    gwMissingBox:SetAutoFocus(false)
+    gwMissingBox:SetText(UsefulStuffDB.gateway.missingText)
+    gwMissingBox:SetScript("OnEnterPressed", function(self)
+        UsefulStuffDB.gateway.missingText = self:GetText()
+        self:ClearFocus()
+        UpdateGatewayDisplay()
+    end)
+    gwMissingBox:SetScript("OnEscapePressed", function(self)
+        self:SetText(UsefulStuffDB.gateway.missingText)
+        self:ClearFocus()
+    end)
+
+    -- Font Dropdown
+    local gwFontLabel = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    gwFontLabel:SetPoint("TOPLEFT", gwMissingBox, "BOTTOMLEFT", -5, -15)
+    gwFontLabel:SetText("Font:")
+
+    local gwFontDropdown = CreateFrame("Frame", "UsefulStuffGWFontDropdown", gatewayPanel, "UIDropDownMenuTemplate")
+    gwFontDropdown:SetPoint("TOPLEFT", gwFontLabel, "BOTTOMLEFT", -15, -5)
+
+    UIDropDownMenu_SetWidth(gwFontDropdown, 150)
+    UIDropDownMenu_Initialize(gwFontDropdown, function(self, level)
+        local fonts = {}
+        if LSM then
+            for _, fontName in pairs(LSM:List("font")) do
+                table.insert(fonts, fontName)
+            end
+            table.sort(fonts)
+        else
+            fonts = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
+        end
+
+        for i, fontName in ipairs(fonts) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = fontName
+            info.func = function()
+                UsefulStuffDB.gateway.font = fontName
+                UIDropDownMenu_SetText(gwFontDropdown, fontName)
+                UpdateGatewayDisplay()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+
+    UIDropDownMenu_SetText(gwFontDropdown, UsefulStuffDB.gateway.font)
+
+    -- Font Size Slider
+    local gwFontSizeSlider = CreateFrame("Slider", "UsefulStuffGWFontSizeSlider", gatewayPanel, "OptionsSliderTemplate")
+    gwFontSizeSlider:SetPoint("TOPLEFT", gwFontDropdown, "BOTTOMLEFT", 15, -30)
+    gwFontSizeSlider:SetMinMaxValues(12, 72)
+    gwFontSizeSlider:SetValue(UsefulStuffDB.gateway.fontSize)
+    gwFontSizeSlider:SetValueStep(2)
+    gwFontSizeSlider:SetObeyStepOnDrag(true)
+    gwFontSizeSlider:SetWidth(200)
+    _G[gwFontSizeSlider:GetName() .. "Low"]:SetText("12")
+    _G[gwFontSizeSlider:GetName() .. "High"]:SetText("72")
+    _G[gwFontSizeSlider:GetName() .. "Text"]:SetText("Font Size: " .. UsefulStuffDB.gateway.fontSize)
+    gwFontSizeSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 2) * 2
+        UsefulStuffDB.gateway.fontSize = value
+        _G[self:GetName() .. "Text"]:SetText("Font Size: " .. value)
+        UpdateGatewayDisplay()
+    end)
+
+    -- Position X Slider
+    local gwPosXSlider = CreateFrame("Slider", "UsefulStuffGWPosXSlider", gatewayPanel, "OptionsSliderTemplate")
+    gwPosXSlider:SetPoint("TOPLEFT", gwFontSizeSlider, "BOTTOMLEFT", 0, -40)
+    gwPosXSlider:SetMinMaxValues(-500, 500)
+    gwPosXSlider:SetValue(UsefulStuffDB.gateway.x)
+    gwPosXSlider:SetValueStep(10)
+    gwPosXSlider:SetObeyStepOnDrag(true)
+    gwPosXSlider:SetWidth(200)
+    _G[gwPosXSlider:GetName() .. "Low"]:SetText("-500")
+    _G[gwPosXSlider:GetName() .. "High"]:SetText("500")
+    _G[gwPosXSlider:GetName() .. "Text"]:SetText("Position X: " .. UsefulStuffDB.gateway.x)
+    gwPosXSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 10) * 10
+        UsefulStuffDB.gateway.x = value
+        _G[self:GetName() .. "Text"]:SetText("Position X: " .. value)
+        UpdateGatewayDisplay()
+    end)
+
+    -- Position Y Slider
+    local gwPosYSlider = CreateFrame("Slider", "UsefulStuffGWPosYSlider", gatewayPanel, "OptionsSliderTemplate")
+    gwPosYSlider:SetPoint("TOPLEFT", gwPosXSlider, "BOTTOMLEFT", 0, -40)
+    gwPosYSlider:SetMinMaxValues(-500, 500)
+    gwPosYSlider:SetValue(UsefulStuffDB.gateway.y)
+    gwPosYSlider:SetValueStep(10)
+    gwPosYSlider:SetObeyStepOnDrag(true)
+    gwPosYSlider:SetWidth(200)
+    _G[gwPosYSlider:GetName() .. "Low"]:SetText("-500")
+    _G[gwPosYSlider:GetName() .. "High"]:SetText("500")
+    _G[gwPosYSlider:GetName() .. "Text"]:SetText("Position Y: " .. UsefulStuffDB.gateway.y)
+    gwPosYSlider:SetScript("OnValueChanged", function(self, value)
+        value = math.floor(value / 10) * 10
+        UsefulStuffDB.gateway.y = value
+        _G[self:GetName() .. "Text"]:SetText("Position Y: " .. value)
+        UpdateGatewayDisplay()
+    end)
+
     -- Select first tab by default
     SelectTab(1)
 
@@ -1770,6 +2040,7 @@ eventFrame:SetScript("OnEvent", function(self, event)
         ApplyAllActionBarMouseovers()
         AnchorCombatTimer()
         UpdateCombatTimerAppearance()
+        InitGateway()
         CreateSettingsPanel()
         print("|cFF00FF00UsefulStuff|r loaded! Configure in ESC > Options > AddOns > UsefulStuff")
     end
