@@ -20,13 +20,13 @@ local defaults = {
     combatTextEnabled = true,
     combatTextEnter = "ENTERING COMBAT!",
     combatTextLeave = "Leaving Combat",
-    combatTextFont = "Friz Quadrata TT",
     combatTextSize = 32,
     combatTextX = 0,
     combatTextY = 200,
     disableBlizzardCombatText = true,
     disableBlizzardBagBar = false,
     actionBarsMouseover = {
+        enabled = true,
         MultiBarBottomLeft = false,
         MultiBarBottomRight = false,
         MultiBarRight = false,
@@ -38,7 +38,6 @@ local defaults = {
     combatTimer = {
         enabled = true,
         borderSize = 1,
-        font = "Friz Quadrata TT",
         fontSize = 14,
         bgTexture = "Interface\\DialogFrame\\UI-DialogBox-Background",
         borderColor = {r = 1, g = 0, b = 0, a = 1},
@@ -49,6 +48,7 @@ local defaults = {
         anchorOffsetY = -5,
     },
     autoLogging = {
+        enabled = true,
         dungeonsMythicPlus = false,
         raidMythic = false,
         raidHeroic = false,
@@ -57,16 +57,10 @@ local defaults = {
         arena = false,
         scenarios = false,
     },
-    chatFont = {
-        enabled = false,
-        font = "Friz Quadrata TT",
-        fontSize = 14,
-    },
     gateway = {
         enabled = true,
         text = "Gateway usable",
         missingText = "Keybind Gateway Control Shard is missing",
-        font = "Friz Quadrata TT",
         fontSize = 24,
         x = 0,
         y = 150,
@@ -77,9 +71,14 @@ local defaults = {
         iconSize = 48,
         x = 0,
         y = 250,
-        font = "Friz Quadrata TT",
         fontSize = 18,
     },
+    buffTrackers = {
+        enabled = true,
+        list = {},
+        nextId = 1,
+    },
+    globalFont = "Friz Quadrata TT",
 }
 
 -- Initialize settings
@@ -107,20 +106,6 @@ local function InitializeSettings()
     end
     if not UsefulStuffDB.combatTextLeave then
         UsefulStuffDB.combatTextLeave = defaults.combatTextLeave
-    end
-    if not UsefulStuffDB.combatTextFont then
-        UsefulStuffDB.combatTextFont = defaults.combatTextFont
-    else
-        -- Migrate old path-based fonts to names
-        local pathToName = {
-            ["Fonts\\FRIZQT__.TTF"] = "Friz Quadrata TT",
-            ["Fonts\\ARIALN.TTF"] = "Arial Narrow",
-            ["Fonts\\skurri.ttf"] = "Skurri",
-            ["Fonts\\MORPHEUS.ttf"] = "Morpheus",
-        }
-        if pathToName[UsefulStuffDB.combatTextFont] then
-            UsefulStuffDB.combatTextFont = pathToName[UsefulStuffDB.combatTextFont]
-        end
     end
     if not UsefulStuffDB.combatTextSize then
         UsefulStuffDB.combatTextSize = defaults.combatTextSize
@@ -154,9 +139,6 @@ local function InitializeSettings()
     if not UsefulStuffDB.combatTimer.borderSize then
         UsefulStuffDB.combatTimer.borderSize = defaults.combatTimer.borderSize
     end
-    if not UsefulStuffDB.combatTimer.font then
-        UsefulStuffDB.combatTimer.font = defaults.combatTimer.font
-    end
     if not UsefulStuffDB.combatTimer.fontSize then
         UsefulStuffDB.combatTimer.fontSize = defaults.combatTimer.fontSize
     end
@@ -189,18 +171,6 @@ local function InitializeSettings()
             UsefulStuffDB.autoLogging[logType] = defaultValue
         end
     end
-    if not UsefulStuffDB.chatFont then
-        UsefulStuffDB.chatFont = {}
-    end
-    if UsefulStuffDB.chatFont.enabled == nil then
-        UsefulStuffDB.chatFont.enabled = defaults.chatFont.enabled
-    end
-    if not UsefulStuffDB.chatFont.font then
-        UsefulStuffDB.chatFont.font = defaults.chatFont.font
-    end
-    if not UsefulStuffDB.chatFont.fontSize then
-        UsefulStuffDB.chatFont.fontSize = defaults.chatFont.fontSize
-    end
     if not UsefulStuffDB.gateway then
         UsefulStuffDB.gateway = {}
     end
@@ -212,9 +182,6 @@ local function InitializeSettings()
     end
     if not UsefulStuffDB.gateway.missingText then
         UsefulStuffDB.gateway.missingText = defaults.gateway.missingText
-    end
-    if not UsefulStuffDB.gateway.font then
-        UsefulStuffDB.gateway.font = defaults.gateway.font
     end
     if not UsefulStuffDB.gateway.fontSize then
         UsefulStuffDB.gateway.fontSize = defaults.gateway.fontSize
@@ -243,11 +210,41 @@ local function InitializeSettings()
     if not UsefulStuffDB.lustTracker.y then
         UsefulStuffDB.lustTracker.y = defaults.lustTracker.y
     end
-    if not UsefulStuffDB.lustTracker.font then
-        UsefulStuffDB.lustTracker.font = defaults.lustTracker.font
-    end
     if not UsefulStuffDB.lustTracker.fontSize then
         UsefulStuffDB.lustTracker.fontSize = defaults.lustTracker.fontSize
+    end
+    if not UsefulStuffDB.buffTrackers then
+        UsefulStuffDB.buffTrackers = {}
+    end
+    if UsefulStuffDB.buffTrackers.enabled == nil then
+        UsefulStuffDB.buffTrackers.enabled = defaults.buffTrackers.enabled
+    end
+    if not UsefulStuffDB.buffTrackers.list then
+        UsefulStuffDB.buffTrackers.list = {}
+    end
+    if not UsefulStuffDB.buffTrackers.nextId then
+        UsefulStuffDB.buffTrackers.nextId = 1
+    end
+    for _, entry in ipairs(UsefulStuffDB.buffTrackers.list) do
+        if entry.fontSize == nil then entry.fontSize = 20 end
+        if entry.x == nil then entry.x = 0 end
+        if entry.y == nil then entry.y = 0 end
+        if entry.color == nil then entry.color = {r = 1, g = 1, b = 1, a = 1} end
+        if entry.locked == nil then entry.locked = true end
+        if entry.showDuration == nil then entry.showDuration = false end
+        if entry.layout == nil then entry.layout = "stacks_duration" end
+    end
+
+    -- Font is now a single global setting shared by every module (Size stays
+    -- per-module). Migrate from whichever per-module font a returning user
+    -- had set before, preferring the one most likely to be intentional.
+    if not UsefulStuffDB.globalFont then
+        UsefulStuffDB.globalFont = UsefulStuffDB.combatTextFont
+            or (UsefulStuffDB.chatFont and UsefulStuffDB.chatFont.font)
+            or (UsefulStuffDB.combatTimer and UsefulStuffDB.combatTimer.font)
+            or (UsefulStuffDB.gateway and UsefulStuffDB.gateway.font)
+            or (UsefulStuffDB.lustTracker and UsefulStuffDB.lustTracker.font)
+            or defaults.globalFont
     end
 end
 
@@ -327,63 +324,6 @@ local function ApplyBlizzardBagBarSetting()
         if MainMenuBarBackpackButton then
             MainMenuBarBackpackButton:Show()
         end
-    end
-end
-
--- Helper: apply font face to all FontStrings in a frame tree (keeps original sizes)
-local function ApplyFontToFrame(frame, fontPath)
-    if not frame then return end
-    local regions = {frame:GetRegions()}
-    for _, region in ipairs(regions) do
-        if region and region.GetObjectType and region:GetObjectType() == "FontString" then
-            local _, currentSize, currentFlags = region:GetFont()
-            if currentSize then
-                region:SetFont(fontPath, currentSize, currentFlags)
-            end
-        end
-    end
-    local children = {frame:GetChildren()}
-    for _, child in ipairs(children) do
-        ApplyFontToFrame(child, fontPath)
-    end
-end
-
--- Function to apply chat font setting
-local function ApplyChatFont()
-    if not UsefulStuffDB.chatFont.enabled then
-        return
-    end
-    local fontPath = GetFontPath(UsefulStuffDB.chatFont.font)
-    local fontSize = UsefulStuffDB.chatFont.fontSize
-
-    -- Chat frames (use selected font size)
-    for i = 1, NUM_CHAT_WINDOWS do
-        local chatFrame = _G["ChatFrame" .. i]
-        if chatFrame then
-            local _, oldSize, flags = chatFrame:GetFont()
-            chatFrame:SetFont(fontPath, fontSize, flags)
-        end
-    end
-
-    -- Objective Tracker
-    if ObjectiveTrackerFrame then
-        ApplyFontToFrame(ObjectiveTrackerFrame, fontPath)
-    end
-end
-
--- Setup hooks so font reapplies when frames update dynamically
-local chatFontHooksInstalled = false
-local function SetupChatFontHooks()
-    if chatFontHooksInstalled then return end
-    chatFontHooksInstalled = true
-
-    -- Hook objective tracker updates
-    if ObjectiveTrackerFrame and ObjectiveTrackerFrame.Update then
-        hooksecurefunc(ObjectiveTrackerFrame, "Update", function()
-            if UsefulStuffDB.chatFont.enabled then
-                ApplyFontToFrame(ObjectiveTrackerFrame, GetFontPath(UsefulStuffDB.chatFont.font))
-            end
-        end)
     end
 end
 
@@ -487,8 +427,9 @@ local function ApplyActionBarMouseover(barName, enable)
 end
 
 local function ApplyAllActionBarMouseovers()
+    local masterEnabled = UsefulStuffDB.actionBarsMouseover.enabled
     for barName, _ in pairs(actionBarFrames) do
-        local enable = UsefulStuffDB.actionBarsMouseover[barName]
+        local enable = masterEnabled and UsefulStuffDB.actionBarsMouseover[barName]
         ApplyActionBarMouseover(barName, enable)
     end
 end
@@ -617,7 +558,7 @@ local function ShowCombatText(text)
     combatTextFrame:ClearAllPoints()
     combatTextFrame:SetPoint("CENTER", UIParent, "CENTER", UsefulStuffDB.combatTextX, UsefulStuffDB.combatTextY)
 
-    local fontPath = GetFontPath(UsefulStuffDB.combatTextFont)
+    local fontPath = GetFontPath(UsefulStuffDB.globalFont)
     combatText:SetFont(fontPath, UsefulStuffDB.combatTextSize, "OUTLINE")
     combatText:SetText(text)
 
@@ -723,7 +664,7 @@ local function UpdateCombatTimerAppearance()
     combatTimerFrame:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
 
     -- Update font
-    local fontPath = GetFontPath(settings.font)
+    local fontPath = GetFontPath(UsefulStuffDB.globalFont)
     combatTimerText:SetFont(fontPath, settings.fontSize, "OUTLINE")
 end
 
@@ -792,6 +733,9 @@ local function ShouldLogCurrentContent()
     end
 
     local settings = UsefulStuffDB.autoLogging
+    if not settings.enabled then
+        return false
+    end
 
     -- Mythic+ Dungeons (Challenge Mode)
     if instanceType == "party" and C_ChallengeMode.IsChallengeModeActive() then
@@ -879,7 +823,7 @@ local function UpdateGatewayDisplay()
     end
 
     local settings = UsefulStuffDB.gateway
-    local fontPath = GetFontPath(settings.font)
+    local fontPath = GetFontPath(UsefulStuffDB.globalFont)
     gatewayText:SetFont(fontPath, settings.fontSize, "OUTLINE")
 
     gatewayFrame:ClearAllPoints()
@@ -935,7 +879,7 @@ local function UpdateLustTrackerAppearance()
     lustFrame:ClearAllPoints()
     lustFrame:SetPoint("CENTER", UIParent, "CENTER", settings.x, settings.y)
     lustIcon:SetTexture(settings.iconId)
-    local fontPath = GetFontPath(settings.font)
+    local fontPath = GetFontPath(UsefulStuffDB.globalFont)
     lustTimerText:SetFont(fontPath, settings.fontSize, "OUTLINE")
 end
 
@@ -978,148 +922,486 @@ local function InitLustTracker()
     UpdateLustTrackerAppearance()
 end
 
--- Create settings panel
+-- ============================================================
+-- Buff Stack Tracker (native AuraContainer - the EUI approach)
+--
+-- Earlier version called C_UnitAuras.GetUnitAuraBySpellID from plain addon
+-- Lua on a timer/event - confirmed NOT reliable in combat (12.1 auras-secret
+-- content denies even a single-spellID read back to addon code in practice).
+--
+-- EllesmereUI's AuraBars don't hit that wall because they never read the
+-- value into Lua at all: they create Blizzard's own native
+-- CreateFrame("AuraContainer", ..., "CustomAuraContainerTemplate") widget
+-- (shipped with the client since 12.1 - see EllesmereUI_AuraKit.lua, and the
+-- same template is used by DBM, Plater, MiniAuras, BuffReminders, etc.), add
+-- an aura group filtered to one spell ID, and call
+-- button:SetApplicationCount(fontString) EXACTLY ONCE when the button is
+-- created. From then on Blizzard's own trusted code keeps that fontstring's
+-- text updated directly - including while auras are secret - because the
+-- addon never touches the number again. Any later Lua write into that button
+-- subtree is what gets denied in combat, so this only ever writes to it once,
+-- at creation, before that lockdown applies.
+-- ============================================================
+local buffTrackerAnchors = {}  -- [id] = draggable anchor frame (holds the container)
+local buffTrackerPending = {}  -- [id] = entry, build was denied (combat lockdown), retry later
+
+-- Blizzard reports a plain (non-stacking) buff as 0 applications, so the
+-- fontstring bound via SetApplicationCount literally reads "0" while the buff
+-- is up but not stacked - we can't tell that apart from "no extra stacks yet"
+-- because the value stays secret; we never get to read it ourselves to
+-- decide. The same textFormatter mechanism SetDurationText uses (a
+-- NumericRuleFormatter evaluated engine-side, so the raw number never has to
+-- reach addon Lua) lets us render blank for 0-1 and the real count from 2
+-- up, without ever seeing the value: this is Blizzard's own code deciding,
+-- not ours. Built once and cached; nil means "not supported on this client",
+-- in which case SetApplicationCount falls back to its default behavior.
+local buffTrackerAppFormatter -- nil = not yet tried, false = tried and unsupported
+local function GetBuffTrackerAppFormatter()
+    if buffTrackerAppFormatter == nil then
+        local formatter = false
+        if C_StringUtil and C_StringUtil.CreateNumericRuleFormatter and Enum.NumericRuleFormatRounding then
+            local f = C_StringUtil.CreateNumericRuleFormatter()
+            local ok = pcall(f.SetBreakpoints, f, {
+                { threshold = 0, format = "",   step = 1, rounding = Enum.NumericRuleFormatRounding.Down },
+                { threshold = 2, format = "%d", step = 1, rounding = Enum.NumericRuleFormatRounding.Down },
+            })
+            if ok then formatter = f end
+        end
+        buffTrackerAppFormatter = formatter
+    end
+    return buffTrackerAppFormatter or nil
+end
+
+local function ApplyBuffTrackerLockState(entry)
+    local anchor = buffTrackerAnchors[entry.id]
+    if not anchor then return end
+    anchor:EnableMouse(not entry.locked)
+    -- The placeholder is OUR OWN plain fontstring (never bound via
+    -- SetApplicationCount), so freely showing/hiding it is always safe, even
+    -- in combat - unlike the real button's text once Blizzard owns it.
+    if anchor.placeholder then
+        anchor.placeholder:SetShown(not entry.locked)
+    end
+end
+
+-- Builds (or rebuilds) the anchor + AuraContainer for one entry. Called at
+-- login, on Add, and whenever font/size changes (simplest safe way to change
+-- the display: it changes the button, so it is recreated rather than
+-- mutated). Frame/AddAuraGroup creation can be denied while InCombatLockdown,
+-- so this is pcall-wrapped and queued for retry via buffTrackerPending.
+local function BuildBuffTrackerEntry(entry)
+    local old = buffTrackerAnchors[entry.id]
+    if old then
+        old:Hide()
+        old:SetParent(nil)
+        buffTrackerAnchors[entry.id] = nil
+    end
+
+    local ok = pcall(function()
+        local anchor = CreateFrame("Frame", "UsefulStuffBuffTrackerAnchor" .. entry.id, UIParent)
+        anchor:SetSize(math.max(40, entry.fontSize * 3), entry.fontSize + 10)
+        anchor:SetFrameStrata("MEDIUM")
+        anchor:SetMovable(true)
+        anchor:SetClampedToScreen(true)
+        anchor:RegisterForDrag("LeftButton")
+        anchor:ClearAllPoints()
+        anchor:SetPoint("CENTER", UIParent, "CENTER", entry.x, entry.y)
+
+        local fontPath = GetFontPath(UsefulStuffDB.globalFont)
+        local c = entry.color or {r = 1, g = 1, b = 1, a = 1}
+
+        -- Positioning aid only, shown while unlocked: the real display (below)
+        -- only exists while the buff is actually up, so without this there
+        -- would be nothing to grab and drag when the buff is inactive. Uses a
+        -- dot, not a number, so it is never mistaken for a real stack count.
+        local placeholder = anchor:CreateFontString(nil, "OVERLAY")
+        placeholder:SetPoint("CENTER")
+        placeholder:SetFont(fontPath, entry.fontSize, "OUTLINE")
+        placeholder:SetTextColor(c.r, c.g, c.b, 0.4)
+        placeholder:SetText("•")
+        placeholder:Hide()
+        anchor.placeholder = placeholder
+
+        anchor:SetScript("OnDragStart", function(self)
+            if not entry.locked then
+                self:StartMoving()
+            end
+        end)
+        anchor:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            local _, _, _, x, y = self:GetPoint()
+            entry.x = math.floor(x + 0.5)
+            entry.y = math.floor(y + 0.5)
+        end)
+
+        local container = CreateFrame("AuraContainer", nil, anchor, "CustomAuraContainerTemplate")
+        container:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+        container:SetSize(1, 1)
+        container:AddAuraGroup("stack", "HELPFUL", {
+            maxFrameCount = 1,
+            candidateFilters = { includeSpellIDs = { [entry.spellID] = true } },
+            initializeFrame = function(button)
+                button:EnableMouse(false)
+                local width = math.max(20, entry.fontSize * 2) * (entry.showDuration and 2 or 1)
+                button:SetSize(width, entry.fontSize + 6)
+
+                local stackText = button:CreateFontString(nil, "OVERLAY")
+                stackText:SetJustifyH("CENTER")
+                -- Must be styled BEFORE SetApplicationCount/SetDurationText:
+                -- those calls fire an immediate SetText, and an unstyled
+                -- (fontless) fontstring hard-errors inside the engine.
+                stackText:SetFont(fontPath, entry.fontSize, "OUTLINE")
+                stackText:SetTextColor(c.r, c.g, c.b, c.a)
+
+                local durationText
+                if entry.showDuration then
+                    durationText = button:CreateFontString(nil, "OVERLAY")
+                    durationText:SetJustifyH("CENTER")
+                    durationText:SetFont(fontPath, entry.fontSize, "OUTLINE")
+                    durationText:SetTextColor(c.r, c.g, c.b, c.a)
+                end
+
+                if durationText then
+                    -- "duration_stacks": Duration - Stacks (duration on the
+                    -- left). Anything else ("stacks_duration", the default):
+                    -- Stacks - Duration.
+                    if entry.layout == "duration_stacks" then
+                        durationText:SetPoint("RIGHT", button, "CENTER", -3, 0)
+                        stackText:SetPoint("LEFT", button, "CENTER", 3, 0)
+                    else
+                        stackText:SetPoint("RIGHT", button, "CENTER", -3, 0)
+                        durationText:SetPoint("LEFT", button, "CENTER", 3, 0)
+                    end
+                else
+                    stackText:SetPoint("CENTER", button, "CENTER", 0, 0)
+                end
+
+                local formatter = GetBuffTrackerAppFormatter()
+                local bound = formatter and pcall(button.SetApplicationCount, button, stackText, { textFormatter = formatter })
+                if not bound then
+                    -- Formatter unsupported on this client: fall back to
+                    -- Blizzard's raw count (may show "0" for a 1-instance,
+                    -- non-stacking buff - see comment above).
+                    button:SetApplicationCount(stackText)
+                end
+
+                if durationText then
+                    button:SetDurationText(durationText)
+                end
+            end,
+        })
+        container:SetUnit("player")
+        container:UpdateAllAuras()
+        anchor.container = container
+
+        buffTrackerAnchors[entry.id] = anchor
+    end)
+
+    if ok then
+        buffTrackerPending[entry.id] = nil
+        ApplyBuffTrackerLockState(entry)
+    else
+        buffTrackerPending[entry.id] = entry
+    end
+    return ok
+end
+
+local function RetryPendingBuffTrackers()
+    if not next(buffTrackerPending) then return end
+    local retry = buffTrackerPending
+    buffTrackerPending = {}
+    for _, entry in pairs(retry) do
+        BuildBuffTrackerEntry(entry)
+    end
+end
+
+local buffTrackerLiftWatcher = CreateFrame("Frame")
+buffTrackerLiftWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+buffTrackerLiftWatcher:RegisterEvent("ENCOUNTER_END")
+buffTrackerLiftWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+buffTrackerLiftWatcher:SetScript("OnEvent", RetryPendingBuffTrackers)
+
+local function AddBuffTracker(spellID)
+    spellID = tonumber(spellID)
+    if not spellID or spellID <= 0 then return nil end
+
+    local db = UsefulStuffDB.buffTrackers
+    local entry = {
+        id = db.nextId,
+        spellID = spellID,
+        x = 0,
+        y = 0,
+        fontSize = 24,
+        color = {r = 1, g = 1, b = 1, a = 1},
+        locked = false, -- start unlocked so there's something visible to drag right away
+        showDuration = false,
+        layout = "stacks_duration", -- or "duration_stacks"
+    }
+    db.nextId = db.nextId + 1
+    table.insert(db.list, entry)
+    if UsefulStuffDB.buffTrackers.enabled then
+        BuildBuffTrackerEntry(entry)
+    end
+    return entry
+end
+
+local function RemoveBuffTracker(id)
+    local db = UsefulStuffDB.buffTrackers
+    for i, entry in ipairs(db.list) do
+        if entry.id == id then
+            local anchor = buffTrackerAnchors[id]
+            if anchor then
+                anchor:Hide()
+                anchor:SetParent(nil)
+                buffTrackerAnchors[id] = nil
+            end
+            buffTrackerPending[id] = nil
+            table.remove(db.list, i)
+            return true
+        end
+    end
+    return false
+end
+
+local function SetBuffTrackersEnabled(enabled)
+    UsefulStuffDB.buffTrackers.enabled = enabled
+    if enabled then
+        for _, entry in ipairs(UsefulStuffDB.buffTrackers.list) do
+            if not buffTrackerAnchors[entry.id] then
+                BuildBuffTrackerEntry(entry)
+            end
+        end
+    else
+        for _, anchor in pairs(buffTrackerAnchors) do
+            anchor:Hide()
+        end
+    end
+end
+
+local function InitBuffTrackers()
+    if not UsefulStuffDB.buffTrackers.enabled then return end
+    for _, entry in ipairs(UsefulStuffDB.buffTrackers.list) do
+        BuildBuffTrackerEntry(entry)
+    end
+end
+
+local UsefulStuffFrame -- set by CreateSettingsPanel; used by the slash command / launcher button
+
+local function ToggleUsefulStuffFrame()
+    if not UsefulStuffFrame then return end
+    if UsefulStuffFrame:IsShown() then
+        UsefulStuffFrame:Hide()
+    else
+        UsefulStuffFrame:Show()
+    end
+end
+
+-- Create settings panel: a standalone, movable window (EllesmereUI-style: a
+-- left sidebar listing every module with its own on/off toggle - greyed out
+-- label when off - and the selected module's settings on the right), rather
+-- than an inline Blizzard AddOns-list canvas.
 local function CreateSettingsPanel()
-    local panel = CreateFrame("Frame", "UsefulStuffOptionsPanel", UIParent)
-    panel.name = "UsefulStuff"
+    local mainFrame = CreateFrame("Frame", "UsefulStuffMainFrame", UIParent, "BackdropTemplate")
+    mainFrame:SetSize(860, 560)
+    mainFrame:SetPoint("CENTER")
+    mainFrame:SetFrameStrata("HIGH")
+    mainFrame:SetMovable(true)
+    mainFrame:EnableMouse(true)
+    mainFrame:SetClampedToScreen(true)
+    mainFrame:SetBackdrop({
+        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    mainFrame:SetBackdropColor(0.04, 0.04, 0.05, 0.97)
+    mainFrame:SetBackdropBorderColor(0.16, 0.16, 0.18, 1)
+    mainFrame:Hide()
+    -- Deliberately NOT added to UISpecialFrames: that ties this frame into
+    -- Blizzard's "close special windows" cascade, which also fires when the
+    -- Settings/AddOns panel itself is closed - so opening us from that
+    -- panel's launcher button and then closing the panel closed us too.
+    UsefulStuffFrame = mainFrame
 
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("UsefulStuff Settings")
+    -- Title bar: drag anywhere on it to move the whole window
+    local titleBar = CreateFrame("Frame", nil, mainFrame)
+    titleBar:SetHeight(36)
+    titleBar:SetPoint("TOPLEFT", 0, 0)
+    titleBar:SetPoint("TOPRIGHT", 0, 0)
+    titleBar:EnableMouse(true)
+    titleBar:RegisterForDrag("LeftButton")
+    titleBar:SetScript("OnDragStart", function() mainFrame:StartMoving() end)
+    titleBar:SetScript("OnDragStop", function() mainFrame:StopMovingOrSizing() end)
 
-    -- Tab System
+    local titleBg = titleBar:CreateTexture(nil, "BACKGROUND")
+    titleBg:SetAllPoints()
+    titleBg:SetColorTexture(0.08, 0.09, 0.1, 1)
+
+    local title = titleBar:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("LEFT", 16, 0)
+    title:SetText("UsefulStuff")
+
+    local closeButton = CreateFrame("Button", nil, mainFrame, "UIPanelCloseButton")
+    closeButton:SetPoint("TOPRIGHT", -4, -4)
+    closeButton:SetScript("OnClick", function() mainFrame:Hide() end)
+
+    -- Sidebar: one row per module
+    local SIDEBAR_WIDTH = 190
+    local sidebar = CreateFrame("Frame", nil, mainFrame)
+    sidebar:SetWidth(SIDEBAR_WIDTH)
+    sidebar:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 0, 0)
+    sidebar:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMLEFT", 0, 0)
+
+    local sidebarBg = sidebar:CreateTexture(nil, "BACKGROUND")
+    sidebarBg:SetAllPoints()
+    sidebarBg:SetColorTexture(0.065, 0.065, 0.075, 1)
+
+    local sidebarDivider = mainFrame:CreateTexture(nil, "ARTWORK")
+    sidebarDivider:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 0, 0)
+    sidebarDivider:SetPoint("BOTTOMLEFT", sidebar, "BOTTOMRIGHT", 0, 0)
+    sidebarDivider:SetWidth(1)
+    sidebarDivider:SetColorTexture(0.2, 0.2, 0.23, 1)
+
+    -- Content area: every module panel below anchors into THIS (kept named
+    -- "panel" so the existing per-tab panel code further down - which
+    -- anchors to `panel` - needs no changes beyond its own top-left point).
+    local panel = CreateFrame("Frame", "UsefulStuffOptionsPanel", mainFrame)
+    panel:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 0, 0)
+    panel:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", 0, 0)
+
     local tabs = {}
     local tabPanels = {}
+    local selectedIndex = 1
 
     local function SelectTab(id)
-        for i, tab in ipairs(tabs) do
-            if i == id then
-                tab:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-ActiveTab")
-                tabPanels[i]:Show()
-            else
-                tab:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-                tabPanels[i]:Hide()
+        selectedIndex = id
+        for i, row in ipairs(tabs) do
+            if row.RefreshVisual then row.RefreshVisual(i == id) end
+            if tabPanels[i] then
+                if i == id then tabPanels[i]:Show() else tabPanels[i]:Hide() end
             end
         end
     end
 
-    -- Tab 1: General
-    local tab1 = CreateFrame("Button", "UsefulStuffTab1", panel)
-    tab1:SetSize(100, 32)
-    tab1:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 5, -8)
-    tab1:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-ActiveTab")
-    tab1:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+    -- One entry per module panel below, in the same order they get inserted
+    -- into tabPanels (General, Cursor Circle, Combat Text, Action Bars,
+    -- Combat Timer, Auto Logging, Gateway, Lust Tracker, Buff Tracker).
+    -- isEnabled/setEnabled are omitted for General: it holds only sub-toggles
+    -- of its own (bag bar, chat font), not a single master switch.
+    local MODULES = {
+        { label = "General" },
+        { label = "Cursor Circle",
+            isEnabled = function() return UsefulStuffDB.cursorCircleEnabled end,
+            setEnabled = function(v) UsefulStuffDB.cursorCircleEnabled = v end },
+        { label = "Combat Text",
+            isEnabled = function() return UsefulStuffDB.combatTextEnabled end,
+            setEnabled = function(v) UsefulStuffDB.combatTextEnabled = v end },
+        { label = "Action Bars",
+            isEnabled = function() return UsefulStuffDB.actionBarsMouseover.enabled end,
+            setEnabled = function(v)
+                UsefulStuffDB.actionBarsMouseover.enabled = v
+                ApplyAllActionBarMouseovers()
+            end },
+        { label = "Combat Timer",
+            isEnabled = function() return UsefulStuffDB.combatTimer.enabled end,
+            setEnabled = function(v) UsefulStuffDB.combatTimer.enabled = v end },
+        { label = "Auto Logging",
+            isEnabled = function() return UsefulStuffDB.autoLogging.enabled end,
+            setEnabled = function(v) UsefulStuffDB.autoLogging.enabled = v end },
+        { label = "Gateway",
+            isEnabled = function() return UsefulStuffDB.gateway.enabled end,
+            setEnabled = function(v)
+                UsefulStuffDB.gateway.enabled = v
+                UpdateGatewayDisplay()
+            end },
+        { label = "Lust Tracker",
+            isEnabled = function() return UsefulStuffDB.lustTracker.enabled end,
+            setEnabled = function(v)
+                UsefulStuffDB.lustTracker.enabled = v
+                if not v then lustFrame:Hide() end
+            end },
+        { label = "Buff Tracker",
+            isEnabled = function() return UsefulStuffDB.buffTrackers.enabled end,
+            setEnabled = function(v) SetBuffTrackersEnabled(v) end },
+    }
 
-    local tab1Text = tab1:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab1Text:SetPoint("CENTER", 0, -2)
-    tab1Text:SetText("General")
+    local ROW_HEIGHT = 34
+    local LABEL_ON = { 0.92, 0.92, 0.94 }
+    local LABEL_OFF = { 0.45, 0.45, 0.48 }
 
-    tab1:SetScript("OnClick", function() SelectTab(1) end)
-    table.insert(tabs, tab1)
+    for i, mod in ipairs(MODULES) do
+        local row = CreateFrame("Button", nil, sidebar)
+        row:SetHeight(ROW_HEIGHT)
+        row:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 0, -10 - (i - 1) * ROW_HEIGHT)
+        row:SetPoint("RIGHT", sidebar, "RIGHT", 0, 0)
 
-    -- Tab 2: Cursor Circle
-    local tab2 = CreateFrame("Button", "UsefulStuffTab2", panel)
-    tab2:SetSize(100, 32)
-    tab2:SetPoint("LEFT", tab1, "RIGHT", -15, 0)
-    tab2:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-    tab2:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+        local rowBg = row:CreateTexture(nil, "BACKGROUND")
+        rowBg:SetAllPoints()
+        rowBg:SetColorTexture(1, 1, 1, 0)
 
-    local tab2Text = tab2:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab2Text:SetPoint("CENTER", 0, -2)
-    tab2Text:SetText("Cursor Circle")
+        local accent = row:CreateTexture(nil, "ARTWORK")
+        accent:SetPoint("TOPLEFT", 0, 0)
+        accent:SetPoint("BOTTOMLEFT", 0, 0)
+        accent:SetWidth(3)
+        accent:SetColorTexture(0.16, 0.82, 0.62, 1)
+        accent:Hide()
 
-    tab2:SetScript("OnClick", function() SelectTab(2) end)
-    table.insert(tabs, tab2)
+        local label = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        label:SetPoint("LEFT", 14, 0)
+        label:SetText(mod.label)
 
-    -- Tab 3: Combat Text
-    local tab3 = CreateFrame("Button", "UsefulStuffTab3", panel)
-    tab3:SetSize(100, 32)
-    tab3:SetPoint("LEFT", tab2, "RIGHT", -15, 0)
-    tab3:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-    tab3:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+        local toggle
+        if mod.isEnabled then
+            toggle = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            toggle:SetSize(44, 20)
+            toggle:SetPoint("RIGHT", -10, 0)
+        else
+            label:SetPoint("RIGHT", -10, 0)
+        end
 
-    local tab3Text = tab3:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab3Text:SetPoint("CENTER", 0, -2)
-    tab3Text:SetText("Combat Text")
+        local function Refresh(selected)
+            local enabled = (not mod.isEnabled) or mod.isEnabled()
+            local c = enabled and LABEL_ON or LABEL_OFF
+            label:SetTextColor(c[1], c[2], c[3])
+            if toggle then
+                toggle:SetText(enabled and "ON" or "OFF")
+            end
+            if selected then
+                rowBg:SetColorTexture(1, 1, 1, 0.06)
+                accent:Show()
+            else
+                rowBg:SetColorTexture(1, 1, 1, 0)
+                accent:Hide()
+            end
+        end
+        row.RefreshVisual = Refresh
 
-    tab3:SetScript("OnClick", function() SelectTab(3) end)
-    table.insert(tabs, tab3)
+        row:SetScript("OnClick", function() SelectTab(i) end)
+        row:SetScript("OnEnter", function()
+            if selectedIndex ~= i then rowBg:SetColorTexture(1, 1, 1, 0.03) end
+        end)
+        row:SetScript("OnLeave", function() Refresh(selectedIndex == i) end)
 
-    -- Tab 4: Action Bars
-    local tab4 = CreateFrame("Button", "UsefulStuffTab4", panel)
-    tab4:SetSize(100, 32)
-    tab4:SetPoint("LEFT", tab3, "RIGHT", -15, 0)
-    tab4:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-    tab4:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+        if toggle then
+            toggle:SetScript("OnClick", function()
+                mod.setEnabled(not mod.isEnabled())
+                Refresh(selectedIndex == i)
+            end)
+        end
 
-    local tab4Text = tab4:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab4Text:SetPoint("CENTER", 0, -2)
-    tab4Text:SetText("Action Bars")
-
-    tab4:SetScript("OnClick", function() SelectTab(4) end)
-    table.insert(tabs, tab4)
-
-    -- Tab 5: Combat Timer
-    local tab5 = CreateFrame("Button", "UsefulStuffTab5", panel)
-    tab5:SetSize(100, 32)
-    tab5:SetPoint("LEFT", tab4, "RIGHT", -15, 0)
-    tab5:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-    tab5:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-
-    local tab5Text = tab5:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab5Text:SetPoint("CENTER", 0, -2)
-    tab5Text:SetText("Combat Timer")
-
-    tab5:SetScript("OnClick", function() SelectTab(5) end)
-    table.insert(tabs, tab5)
-
-    -- Tab 6: Auto Logging
-    local tab6 = CreateFrame("Button", "UsefulStuffTab6", panel)
-    tab6:SetSize(100, 32)
-    tab6:SetPoint("LEFT", tab5, "RIGHT", -15, 0)
-    tab6:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-    tab6:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-
-    local tab6Text = tab6:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab6Text:SetPoint("CENTER", 0, -2)
-    tab6Text:SetText("Auto Logging")
-
-    tab6:SetScript("OnClick", function() SelectTab(6) end)
-    table.insert(tabs, tab6)
-
-    -- Tab 7: Gateway
-    local tab7 = CreateFrame("Button", "UsefulStuffTab7", panel)
-    tab7:SetSize(100, 32)
-    tab7:SetPoint("LEFT", tab6, "RIGHT", -15, 0)
-    tab7:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-    tab7:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-
-    local tab7Text = tab7:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab7Text:SetPoint("CENTER", 0, -2)
-    tab7Text:SetText("Gateway")
-
-    tab7:SetScript("OnClick", function() SelectTab(7) end)
-    table.insert(tabs, tab7)
-
-    -- Tab 8: Lust Tracker
-    local tab8 = CreateFrame("Button", "UsefulStuffTab8", panel)
-    tab8:SetSize(100, 32)
-    tab8:SetPoint("LEFT", tab7, "RIGHT", -15, 0)
-    tab8:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-InactiveTab")
-    tab8:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-
-    local tab8Text = tab8:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    tab8Text:SetPoint("CENTER", 0, -2)
-    tab8Text:SetText("Lust Tracker")
-
-    tab8:SetScript("OnClick", function() SelectTab(8) end)
-    table.insert(tabs, tab8)
+        Refresh(false)
+        table.insert(tabs, row)
+    end
 
     -- Panel 1: General Settings
-    local generalPanel = CreateFrame("Frame", nil, panel)
-    generalPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    generalPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    table.insert(tabPanels, generalPanel)
+    local generalScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    generalScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    generalScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    generalScroll:Hide()
+    local generalPanel = CreateFrame("Frame", nil, generalScroll)
+    generalPanel:SetSize(600, 900)
+    generalScroll:SetScrollChild(generalPanel)
+    table.insert(tabPanels, generalScroll)
 
     -- Disable Blizzard Bag Bar Checkbox
     local disableBagBarCheckbox = CreateFrame("CheckButton", "UsefulStuffDisableBagBarCheckbox", generalPanel, "UICheckButtonTemplate")
@@ -1136,40 +1418,28 @@ local function CreateSettingsPanel()
         ApplyBlizzardBagBarSetting()
     end)
 
-    -- Chat Font Section
-    local chatFontTitle = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    chatFontTitle:SetPoint("TOPLEFT", disableBagBarCheckbox, "BOTTOMLEFT", 0, -25)
-    chatFontTitle:SetText("Chat Font")
+    -- Font Section: one global font used by every module below (Combat Text,
+    -- Combat Timer, Gateway, Lust Tracker, Buff Tracker). Each module keeps
+    -- its own font SIZE setting; only the face is shared.
+    local fontTitle = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    fontTitle:SetPoint("TOPLEFT", disableBagBarCheckbox, "BOTTOMLEFT", 0, -25)
+    fontTitle:SetText("Font")
 
-    local chatFontDesc = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    chatFontDesc:SetPoint("TOPLEFT", chatFontTitle, "BOTTOMLEFT", 0, -5)
-    chatFontDesc:SetText("Override the default Blizzard chat font")
+    local fontDesc = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    fontDesc:SetPoint("TOPLEFT", fontTitle, "BOTTOMLEFT", 0, -5)
+    fontDesc:SetWidth(560)
+    fontDesc:SetJustifyH("LEFT")
+    fontDesc:SetText("Used by every module below. Each module still has its own font size setting.")
 
-    -- Enable Chat Font Checkbox
-    local enableChatFontCheckbox = CreateFrame("CheckButton", "UsefulStuffEnableChatFontCheckbox", generalPanel, "UICheckButtonTemplate")
-    enableChatFontCheckbox:SetPoint("TOPLEFT", chatFontDesc, "BOTTOMLEFT", 0, -10)
-    enableChatFontCheckbox:SetSize(24, 24)
-    enableChatFontCheckbox:SetChecked(UsefulStuffDB.chatFont.enabled)
+    local fontLabel = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    fontLabel:SetPoint("TOPLEFT", fontDesc, "BOTTOMLEFT", 0, -15)
+    fontLabel:SetText("Font:")
 
-    local enableChatFontLabel = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    enableChatFontLabel:SetPoint("LEFT", enableChatFontCheckbox, "RIGHT", 5, 0)
-    enableChatFontLabel:SetText("Enable Custom Chat Font")
+    local fontDropdown = CreateFrame("Frame", "UsefulStuffGlobalFontDropdown", generalPanel, "UIDropDownMenuTemplate")
+    fontDropdown:SetPoint("TOPLEFT", fontLabel, "BOTTOMLEFT", -15, -5)
 
-    enableChatFontCheckbox:SetScript("OnClick", function(self)
-        UsefulStuffDB.chatFont.enabled = self:GetChecked()
-        ApplyChatFont()
-    end)
-
-    -- Chat Font Dropdown
-    local chatFontLabel = generalPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    chatFontLabel:SetPoint("TOPLEFT", enableChatFontCheckbox, "BOTTOMLEFT", 0, -15)
-    chatFontLabel:SetText("Font:")
-
-    local chatFontDropdown = CreateFrame("Frame", "UsefulStuffChatFontDropdown", generalPanel, "UIDropDownMenuTemplate")
-    chatFontDropdown:SetPoint("TOPLEFT", chatFontLabel, "BOTTOMLEFT", -15, -5)
-
-    UIDropDownMenu_SetWidth(chatFontDropdown, 150)
-    UIDropDownMenu_Initialize(chatFontDropdown, function(self, level)
+    UIDropDownMenu_SetWidth(fontDropdown, 150)
+    UIDropDownMenu_Initialize(fontDropdown, function(self, level)
         local fonts = {}
         if LSM then
             for _, fontName in pairs(LSM:List("font")) do
@@ -1184,40 +1454,32 @@ local function CreateSettingsPanel()
             local info = UIDropDownMenu_CreateInfo()
             info.text = fontName
             info.func = function()
-                UsefulStuffDB.chatFont.font = fontName
-                UIDropDownMenu_SetText(chatFontDropdown, fontName)
-                ApplyChatFont()
+                UsefulStuffDB.globalFont = fontName
+                UIDropDownMenu_SetText(fontDropdown, fontName)
+                UpdateCombatTimerAppearance()
+                UpdateGatewayDisplay()
+                UpdateLustTrackerAppearance()
+                if UsefulStuffDB.buffTrackers.enabled then
+                    for _, entry in ipairs(UsefulStuffDB.buffTrackers.list) do
+                        BuildBuffTrackerEntry(entry)
+                    end
+                end
             end
             UIDropDownMenu_AddButton(info)
         end
     end)
 
-    UIDropDownMenu_SetText(chatFontDropdown, UsefulStuffDB.chatFont.font)
-
-    -- Chat Font Size Slider
-    local chatFontSizeSlider = CreateFrame("Slider", "UsefulStuffChatFontSizeSlider", generalPanel, "OptionsSliderTemplate")
-    chatFontSizeSlider:SetPoint("TOPLEFT", chatFontDropdown, "BOTTOMLEFT", 15, -30)
-    chatFontSizeSlider:SetMinMaxValues(8, 32)
-    chatFontSizeSlider:SetValue(UsefulStuffDB.chatFont.fontSize)
-    chatFontSizeSlider:SetValueStep(1)
-    chatFontSizeSlider:SetObeyStepOnDrag(true)
-    chatFontSizeSlider:SetWidth(200)
-    _G[chatFontSizeSlider:GetName() .. "Low"]:SetText("8")
-    _G[chatFontSizeSlider:GetName() .. "High"]:SetText("32")
-    _G[chatFontSizeSlider:GetName() .. "Text"]:SetText("Font Size: " .. UsefulStuffDB.chatFont.fontSize)
-    chatFontSizeSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value)
-        UsefulStuffDB.chatFont.fontSize = value
-        _G[self:GetName() .. "Text"]:SetText("Font Size: " .. value)
-        ApplyChatFont()
-    end)
+    UIDropDownMenu_SetText(fontDropdown, UsefulStuffDB.globalFont)
 
     -- Panel 2: Cursor Circle Settings
-    local circlePanel = CreateFrame("Frame", nil, panel)
-    circlePanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    circlePanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    circlePanel:Hide()
-    table.insert(tabPanels, circlePanel)
+    local circleScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    circleScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    circleScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    circleScroll:Hide()
+    local circlePanel = CreateFrame("Frame", nil, circleScroll)
+    circlePanel:SetSize(600, 900)
+    circleScroll:SetScrollChild(circlePanel)
+    table.insert(tabPanels, circleScroll)
 
     -- Enable Cursor Circle Checkbox
     local enableCircleCheckbox = CreateFrame("CheckButton", "UsefulStuffEnableCircleCheckbox", circlePanel, "UICheckButtonTemplate")
@@ -1322,11 +1584,14 @@ local function CreateSettingsPanel()
     end)
 
     -- Panel 2: Combat Text Settings
-    local combatPanel = CreateFrame("Frame", nil, panel)
-    combatPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    combatPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    combatPanel:Hide()
-    table.insert(tabPanels, combatPanel)
+    local combatScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    combatScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    combatScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    combatScroll:Hide()
+    local combatPanel = CreateFrame("Frame", nil, combatScroll)
+    combatPanel:SetSize(600, 900)
+    combatScroll:SetScrollChild(combatPanel)
+    table.insert(tabPanels, combatScroll)
 
     -- Enable Combat Text Checkbox
     local enableCombatTextCheckbox = CreateFrame("CheckButton", "UsefulStuffEnableCombatTextCheckbox", combatPanel, "UICheckButtonTemplate")
@@ -1397,52 +1662,9 @@ local function CreateSettingsPanel()
         _G[self:GetName() .. "Text"]:SetText("Font Size: " .. value)
     end)
 
-    -- Font Dropdown with SharedMedia support
-    local fontLabel = combatPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    fontLabel:SetPoint("TOPLEFT", fontSizeSlider, "BOTTOMLEFT", 0, -40)
-    fontLabel:SetText("Font:")
-
-    local fontDropdown = CreateFrame("Frame", "UsefulStuffFontDropdown", combatPanel, "UIDropDownMenuTemplate")
-    fontDropdown:SetPoint("TOPLEFT", fontLabel, "BOTTOMLEFT", -15, -5)
-
-    local function GetFontList()
-        if LSM then
-            local fonts = {}
-            for _, fontName in pairs(LSM:List("font")) do
-                table.insert(fonts, fontName)
-            end
-            table.sort(fonts)
-            return fonts
-        else
-            return {
-                "Friz Quadrata TT",
-                "Arial Narrow",
-                "Skurri",
-                "Morpheus",
-            }
-        end
-    end
-
-    UIDropDownMenu_SetWidth(fontDropdown, 150)
-    UIDropDownMenu_Initialize(fontDropdown, function(self, level)
-        local fonts = GetFontList()
-        for i, fontName in ipairs(fonts) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = fontName
-            info.func = function()
-                UsefulStuffDB.combatTextFont = fontName
-                UIDropDownMenu_SetText(fontDropdown, fontName)
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-
-    -- Set initial dropdown text
-    UIDropDownMenu_SetText(fontDropdown, UsefulStuffDB.combatTextFont)
-
     -- Position X Slider
     local posXSlider = CreateFrame("Slider", "UsefulStuffPosXSlider", combatPanel, "OptionsSliderTemplate")
-    posXSlider:SetPoint("TOPLEFT", fontDropdown, "BOTTOMLEFT", 15, -30)
+    posXSlider:SetPoint("TOPLEFT", fontSizeSlider, "BOTTOMLEFT", 0, -40)
     posXSlider:SetMinMaxValues(-500, 500)
     posXSlider:SetValue(UsefulStuffDB.combatTextX)
     posXSlider:SetValueStep(10)
@@ -1499,11 +1721,14 @@ local function CreateSettingsPanel()
     end)
 
     -- Panel 4: Action Bars Settings
-    local actionBarsPanel = CreateFrame("Frame", nil, panel)
-    actionBarsPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    actionBarsPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    actionBarsPanel:Hide()
-    table.insert(tabPanels, actionBarsPanel)
+    local actionBarsScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    actionBarsScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    actionBarsScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    actionBarsScroll:Hide()
+    local actionBarsPanel = CreateFrame("Frame", nil, actionBarsScroll)
+    actionBarsPanel:SetSize(600, 900)
+    actionBarsScroll:SetScrollChild(actionBarsPanel)
+    table.insert(tabPanels, actionBarsScroll)
 
     local abTitle = actionBarsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     abTitle:SetPoint("TOPLEFT", 0, 0)
@@ -1548,11 +1773,14 @@ local function CreateSettingsPanel()
     end
 
     -- Panel 5: Combat Timer Settings
-    local combatTimerPanel = CreateFrame("Frame", nil, panel)
-    combatTimerPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    combatTimerPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    combatTimerPanel:Hide()
-    table.insert(tabPanels, combatTimerPanel)
+    local combatTimerScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    combatTimerScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    combatTimerScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    combatTimerScroll:Hide()
+    local combatTimerPanel = CreateFrame("Frame", nil, combatTimerScroll)
+    combatTimerPanel:SetSize(600, 900)
+    combatTimerScroll:SetScrollChild(combatTimerPanel)
+    table.insert(tabPanels, combatTimerScroll)
 
     local ctTitle = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     ctTitle:SetPoint("TOPLEFT", 0, 0)
@@ -1612,43 +1840,9 @@ local function CreateSettingsPanel()
         UpdateCombatTimerAppearance()
     end)
 
-    -- Font Dropdown
-    local ctFontLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    ctFontLabel:SetPoint("TOPLEFT", ctFontSizeSlider, "BOTTOMLEFT", 0, -40)
-    ctFontLabel:SetText("Font:")
-
-    local ctFontDropdown = CreateFrame("Frame", "UsefulStuffCTFontDropdown", combatTimerPanel, "UIDropDownMenuTemplate")
-    ctFontDropdown:SetPoint("TOPLEFT", ctFontLabel, "BOTTOMLEFT", -15, -5)
-
-    UIDropDownMenu_SetWidth(ctFontDropdown, 150)
-    UIDropDownMenu_Initialize(ctFontDropdown, function(self, level)
-        local fonts = {}
-        if LSM then
-            for _, fontName in pairs(LSM:List("font")) do
-                table.insert(fonts, fontName)
-            end
-            table.sort(fonts)
-        else
-            fonts = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
-        end
-
-        for i, fontName in ipairs(fonts) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = fontName
-            info.func = function()
-                UsefulStuffDB.combatTimer.font = fontName
-                UIDropDownMenu_SetText(ctFontDropdown, fontName)
-                UpdateCombatTimerAppearance()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-
-    UIDropDownMenu_SetText(ctFontDropdown, UsefulStuffDB.combatTimer.font)
-
     -- Background Texture Dropdown
     local ctBgLabel = combatTimerPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    ctBgLabel:SetPoint("TOPLEFT", ctFontDropdown, "BOTTOMLEFT", 15, -30)
+    ctBgLabel:SetPoint("TOPLEFT", ctFontSizeSlider, "BOTTOMLEFT", 0, -40)
     ctBgLabel:SetText("Background Texture:")
 
     local ctBgDropdown = CreateFrame("Frame", "UsefulStuffCTBgDropdown", combatTimerPanel, "UIDropDownMenuTemplate")
@@ -1853,11 +2047,14 @@ local function CreateSettingsPanel()
     end)
 
     -- Panel 6: Auto Logging Settings
-    local autoLoggingPanel = CreateFrame("Frame", nil, panel)
-    autoLoggingPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    autoLoggingPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    autoLoggingPanel:Hide()
-    table.insert(tabPanels, autoLoggingPanel)
+    local autoLoggingScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    autoLoggingScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    autoLoggingScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    autoLoggingScroll:Hide()
+    local autoLoggingPanel = CreateFrame("Frame", nil, autoLoggingScroll)
+    autoLoggingPanel:SetSize(600, 900)
+    autoLoggingScroll:SetScrollChild(autoLoggingPanel)
+    table.insert(tabPanels, autoLoggingScroll)
 
     local autoLoggingTitle = autoLoggingPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     autoLoggingTitle:SetPoint("TOPLEFT", 0, 0)
@@ -1973,11 +2170,14 @@ local function CreateSettingsPanel()
     end)
 
     -- Panel 7: Gateway Settings
-    local gatewayPanel = CreateFrame("Frame", nil, panel)
-    gatewayPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    gatewayPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    gatewayPanel:Hide()
-    table.insert(tabPanels, gatewayPanel)
+    local gatewayScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    gatewayScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    gatewayScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    gatewayScroll:Hide()
+    local gatewayPanel = CreateFrame("Frame", nil, gatewayScroll)
+    gatewayPanel:SetSize(600, 900)
+    gatewayScroll:SetScrollChild(gatewayPanel)
+    table.insert(tabPanels, gatewayScroll)
 
     local gwTitle = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     gwTitle:SetPoint("TOPLEFT", 0, 0)
@@ -2042,43 +2242,9 @@ local function CreateSettingsPanel()
         self:ClearFocus()
     end)
 
-    -- Font Dropdown
-    local gwFontLabel = gatewayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    gwFontLabel:SetPoint("TOPLEFT", gwMissingBox, "BOTTOMLEFT", -5, -15)
-    gwFontLabel:SetText("Font:")
-
-    local gwFontDropdown = CreateFrame("Frame", "UsefulStuffGWFontDropdown", gatewayPanel, "UIDropDownMenuTemplate")
-    gwFontDropdown:SetPoint("TOPLEFT", gwFontLabel, "BOTTOMLEFT", -15, -5)
-
-    UIDropDownMenu_SetWidth(gwFontDropdown, 150)
-    UIDropDownMenu_Initialize(gwFontDropdown, function(self, level)
-        local fonts = {}
-        if LSM then
-            for _, fontName in pairs(LSM:List("font")) do
-                table.insert(fonts, fontName)
-            end
-            table.sort(fonts)
-        else
-            fonts = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
-        end
-
-        for i, fontName in ipairs(fonts) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = fontName
-            info.func = function()
-                UsefulStuffDB.gateway.font = fontName
-                UIDropDownMenu_SetText(gwFontDropdown, fontName)
-                UpdateGatewayDisplay()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-
-    UIDropDownMenu_SetText(gwFontDropdown, UsefulStuffDB.gateway.font)
-
     -- Font Size Slider
     local gwFontSizeSlider = CreateFrame("Slider", "UsefulStuffGWFontSizeSlider", gatewayPanel, "OptionsSliderTemplate")
-    gwFontSizeSlider:SetPoint("TOPLEFT", gwFontDropdown, "BOTTOMLEFT", 15, -30)
+    gwFontSizeSlider:SetPoint("TOPLEFT", gwMissingBox, "BOTTOMLEFT", -5, -30)
     gwFontSizeSlider:SetMinMaxValues(12, 72)
     gwFontSizeSlider:SetValue(UsefulStuffDB.gateway.fontSize)
     gwFontSizeSlider:SetValueStep(2)
@@ -2131,11 +2297,14 @@ local function CreateSettingsPanel()
     end)
 
     -- Panel 8: Lust Tracker Settings
-    local lustPanel = CreateFrame("Frame", nil, panel)
-    lustPanel:SetPoint("TOPLEFT", tab1, "BOTTOMLEFT", 5, -10)
-    lustPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
-    lustPanel:Hide()
-    table.insert(tabPanels, lustPanel)
+    local lustScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    lustScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    lustScroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -30, 10)
+    lustScroll:Hide()
+    local lustPanel = CreateFrame("Frame", nil, lustScroll)
+    lustPanel:SetSize(600, 900)
+    lustScroll:SetScrollChild(lustPanel)
+    table.insert(tabPanels, lustScroll)
 
     local ltTitle = lustPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     ltTitle:SetPoint("TOPLEFT", 0, 0)
@@ -2201,43 +2370,9 @@ local function CreateSettingsPanel()
         UpdateLustTrackerAppearance()
     end)
 
-    -- Font Dropdown
-    local ltFontLabel = lustPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    ltFontLabel:SetPoint("TOPLEFT", ltSizeSlider, "BOTTOMLEFT", 0, -40)
-    ltFontLabel:SetText("Font:")
-
-    local ltFontDropdown = CreateFrame("Frame", "UsefulStuffLTFontDropdown", lustPanel, "UIDropDownMenuTemplate")
-    ltFontDropdown:SetPoint("TOPLEFT", ltFontLabel, "BOTTOMLEFT", -15, -5)
-
-    UIDropDownMenu_SetWidth(ltFontDropdown, 150)
-    UIDropDownMenu_Initialize(ltFontDropdown, function(self, level)
-        local fonts = {}
-        if LSM then
-            for _, fontName in pairs(LSM:List("font")) do
-                table.insert(fonts, fontName)
-            end
-            table.sort(fonts)
-        else
-            fonts = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
-        end
-
-        for i, fontName in ipairs(fonts) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = fontName
-            info.func = function()
-                UsefulStuffDB.lustTracker.font = fontName
-                UIDropDownMenu_SetText(ltFontDropdown, fontName)
-                UpdateLustTrackerAppearance()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-
-    UIDropDownMenu_SetText(ltFontDropdown, UsefulStuffDB.lustTracker.font)
-
     -- Font Size Slider
     local ltFontSizeSlider = CreateFrame("Slider", "UsefulStuffLTFontSizeSlider", lustPanel, "OptionsSliderTemplate")
-    ltFontSizeSlider:SetPoint("TOPLEFT", ltFontDropdown, "BOTTOMLEFT", 15, -30)
+    ltFontSizeSlider:SetPoint("TOPLEFT", ltSizeSlider, "BOTTOMLEFT", 0, -40)
     ltFontSizeSlider:SetMinMaxValues(10, 48)
     ltFontSizeSlider:SetValue(UsefulStuffDB.lustTracker.fontSize)
     ltFontSizeSlider:SetValueStep(2)
@@ -2289,13 +2424,222 @@ local function CreateSettingsPanel()
         UpdateLustTrackerAppearance()
     end)
 
+    -- Panel 9: Buff Tracker Settings
+    local buffPanel = CreateFrame("Frame", nil, panel)
+    buffPanel:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -10)
+    buffPanel:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 10)
+    buffPanel:Hide()
+    table.insert(tabPanels, buffPanel)
+
+    local btTitle = buffPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    btTitle:SetPoint("TOPLEFT", 0, 0)
+    btTitle:SetText("Buff Tracker")
+
+    local btDesc = buffPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    btDesc:SetPoint("TOPLEFT", btTitle, "BOTTOMLEFT", 0, -5)
+    btDesc:SetWidth(560)
+    btDesc:SetJustifyH("LEFT")
+    btDesc:SetText("Track a buff's stack count by Spell ID. Only the number is shown, no icon - and only from 2 stacks up; at 0 or 1 stack nothing is displayed. Click 'Unlock' on an entry, then drag its number anywhere on screen; click 'Lock' again when done.")
+
+    -- Enable Buff Tracker Checkbox
+    local enableBTCheckbox = CreateFrame("CheckButton", "UsefulStuffEnableBTCheckbox", buffPanel, "UICheckButtonTemplate")
+    enableBTCheckbox:SetPoint("TOPLEFT", btDesc, "BOTTOMLEFT", 0, -15)
+    enableBTCheckbox:SetSize(24, 24)
+    enableBTCheckbox:SetChecked(UsefulStuffDB.buffTrackers.enabled)
+
+    local enableBTLabel = buffPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    enableBTLabel:SetPoint("LEFT", enableBTCheckbox, "RIGHT", 5, 0)
+    enableBTLabel:SetText("Enable Buff Tracker")
+
+    enableBTCheckbox:SetScript("OnClick", function(self)
+        SetBuffTrackersEnabled(self:GetChecked())
+    end)
+
+    -- Add new tracker
+    local btAddLabel = buffPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    btAddLabel:SetPoint("TOPLEFT", enableBTCheckbox, "BOTTOMLEFT", 0, -20)
+    btAddLabel:SetText("Spell ID:")
+
+    local btAddInput = CreateFrame("EditBox", "UsefulStuffBTAddInput", buffPanel, "InputBoxTemplate")
+    btAddInput:SetPoint("LEFT", btAddLabel, "RIGHT", 10, 0)
+    btAddInput:SetSize(100, 20)
+    btAddInput:SetAutoFocus(false)
+    btAddInput:SetNumeric(true)
+
+    local btAddButton = CreateFrame("Button", "UsefulStuffBTAddButton", buffPanel, "UIPanelButtonTemplate")
+    btAddButton:SetPoint("LEFT", btAddInput, "RIGHT", 10, 0)
+    btAddButton:SetSize(80, 22)
+    btAddButton:SetText("Add")
+
+    -- Forward declaration so the Add/Remove buttons below can refresh the list
+    local RefreshBuffTrackerRows
+
+    btAddButton:SetScript("OnClick", function()
+        local spellID = tonumber(btAddInput:GetText())
+        if spellID and spellID > 0 then
+            AddBuffTracker(spellID)
+            btAddInput:SetText("")
+            btAddInput:ClearFocus()
+            if RefreshBuffTrackerRows then RefreshBuffTrackerRows() end
+        end
+    end)
+    btAddInput:SetScript("OnEnterPressed", function()
+        btAddButton:Click()
+    end)
+
+    local btListLabel = buffPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    btListLabel:SetPoint("TOPLEFT", btAddLabel, "BOTTOMLEFT", 0, -20)
+    btListLabel:SetText("Tracked Spells:")
+
+    local btScrollFrame = CreateFrame("ScrollFrame", "UsefulStuffBTScrollFrame", buffPanel, "UIPanelScrollFrameTemplate")
+    btScrollFrame:SetPoint("TOPLEFT", btListLabel, "BOTTOMLEFT", 0, -10)
+    btScrollFrame:SetPoint("BOTTOMRIGHT", buffPanel, "BOTTOMRIGHT", -30, 10)
+
+    local btScrollChild = CreateFrame("Frame", "UsefulStuffBTScrollChild", btScrollFrame)
+    btScrollChild:SetSize(600, 1)
+    btScrollFrame:SetScrollChild(btScrollChild)
+
+    local btRowWidgets = {}
+
+    RefreshBuffTrackerRows = function()
+        for _, row in ipairs(btRowWidgets) do
+            row:Hide()
+            row:SetParent(nil)
+        end
+        wipe(btRowWidgets)
+
+        local yOffset = 0
+        for _, entry in ipairs(UsefulStuffDB.buffTrackers.list) do
+            local row = CreateFrame("Frame", nil, btScrollChild)
+            row:SetSize(600, 50)
+            row:SetPoint("TOPLEFT", 0, -yOffset)
+
+            local nameText = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+            nameText:SetPoint("TOPLEFT", 0, 0)
+            nameText:SetWidth(580)
+            nameText:SetJustifyH("LEFT")
+            local spellInfo = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(entry.spellID)
+            local spellName = spellInfo and spellInfo.name or "Unknown"
+            nameText:SetText(string.format("%d - %s", entry.spellID, spellName))
+
+            local lockButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            lockButton:SetSize(65, 20)
+            lockButton:SetPoint("TOPLEFT", nameText, "BOTTOMLEFT", 0, -6)
+            lockButton:SetText(entry.locked and "Unlock" or "Lock")
+            lockButton:SetScript("OnClick", function(self)
+                entry.locked = not entry.locked
+                self:SetText(entry.locked and "Unlock" or "Lock")
+                ApplyBuffTrackerLockState(entry)
+            end)
+
+            local sizeLabel = row:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+            sizeLabel:SetPoint("LEFT", lockButton, "RIGHT", 8, 0)
+            sizeLabel:SetText("Size:")
+
+            local sizeInput = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+            sizeInput:SetSize(35, 20)
+            sizeInput:SetPoint("LEFT", sizeLabel, "RIGHT", 5, 0)
+            sizeInput:SetAutoFocus(false)
+            sizeInput:SetNumeric(true)
+            sizeInput:SetText(tostring(entry.fontSize))
+            sizeInput:SetScript("OnEnterPressed", function(self)
+                local value = tonumber(self:GetText()) or entry.fontSize
+                entry.fontSize = math.max(6, value)
+                self:SetText(tostring(entry.fontSize))
+                self:ClearFocus()
+                BuildBuffTrackerEntry(entry)
+            end)
+
+            -- Duration toggle + layout template (only relevant, and only
+            -- shown, while Duration is checked). Both rebuild the tracker
+            -- since duration/layout are baked in at creation, same as size.
+            local durationCheckbox = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+            durationCheckbox:SetSize(20, 20)
+            durationCheckbox:SetPoint("LEFT", sizeInput, "RIGHT", 8, 0)
+            durationCheckbox:SetChecked(entry.showDuration)
+
+            local durationLabel = row:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+            durationLabel:SetPoint("LEFT", durationCheckbox, "RIGHT", 2, 0)
+            durationLabel:SetText("Duration")
+
+            local templateButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            templateButton:SetSize(80, 20)
+            templateButton:SetPoint("LEFT", durationLabel, "RIGHT", 8, 0)
+            local function UpdateTemplateButtonText()
+                templateButton:SetText(entry.layout == "duration_stacks" and "Dur - Stk" or "Stk - Dur")
+            end
+            UpdateTemplateButtonText()
+            templateButton:SetShown(entry.showDuration)
+            templateButton:SetScript("OnClick", function()
+                entry.layout = (entry.layout == "duration_stacks") and "stacks_duration" or "duration_stacks"
+                UpdateTemplateButtonText()
+                BuildBuffTrackerEntry(entry)
+            end)
+
+            durationCheckbox:SetScript("OnClick", function(self)
+                entry.showDuration = self:GetChecked() and true or false
+                templateButton:SetShown(entry.showDuration)
+                BuildBuffTrackerEntry(entry)
+            end)
+
+            local testButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            testButton:SetSize(55, 20)
+            testButton:SetPoint("LEFT", templateButton, "RIGHT", 8, 0)
+            testButton:SetText("Test")
+            testButton:SetScript("OnClick", function()
+                local ok, aura = pcall(C_UnitAuras.GetUnitAuraBySpellID, "player", entry.spellID, "HELPFUL")
+                local secret = C_Secrets and C_Secrets.ShouldAurasBeSecret and C_Secrets.ShouldAurasBeSecret()
+                if ok and aura then
+                    print(string.format("|cFF00FF00UsefulStuff:|r Spell %d found, stacks=%d, auras secret=%s",
+                        entry.spellID, aura.applications or 0, tostring(secret)))
+                else
+                    print(string.format("|cFFFF0000UsefulStuff:|r Spell %d NOT found (call ok=%s), auras secret=%s",
+                        entry.spellID, tostring(ok), tostring(secret)))
+                end
+            end)
+
+            local removeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            removeButton:SetSize(65, 20)
+            removeButton:SetPoint("LEFT", testButton, "RIGHT", 8, 0)
+            removeButton:SetText("Remove")
+            removeButton:SetScript("OnClick", function()
+                RemoveBuffTracker(entry.id)
+                RefreshBuffTrackerRows()
+            end)
+
+            table.insert(btRowWidgets, row)
+            yOffset = yOffset + 54
+        end
+
+        btScrollChild:SetSize(600, math.max(yOffset, 1))
+    end
+
+    RefreshBuffTrackerRows()
+
     -- Select first tab by default
     SelectTab(1)
+end
 
-    -- Register in new settings system
-    local category = Settings.RegisterCanvasLayoutCategory(panel, "UsefulStuff")
+-- Minimal entry in ESC > Options > AddOns > UsefulStuff: just a launcher
+-- button for the movable window above, the way Method Raid Tools and similar
+-- addons do it, instead of an inline settings canvas.
+local function CreateBlizzardLauncherPanel()
+    local launcherPanel = CreateFrame("Frame")
+    launcherPanel.name = "UsefulStuff"
+
+    local openButton = CreateFrame("Button", nil, launcherPanel, "UIPanelButtonTemplate")
+    openButton:SetSize(200, 32)
+    openButton:SetPoint("CENTER")
+    openButton:SetText("Open UsefulStuff")
+    openButton:SetScript("OnClick", ToggleUsefulStuffFrame)
+
+    local category = Settings.RegisterCanvasLayoutCategory(launcherPanel, "UsefulStuff")
     Settings.RegisterAddOnCategory(category)
 end
+
+SLASH_USEFULSTUFF1 = "/usefulstuff"
+SLASH_USEFULSTUFF2 = "/us"
+SlashCmdList["USEFULSTUFF"] = ToggleUsefulStuffFrame
 
 -- Initialize addon
 local eventFrame = CreateFrame("Frame")
@@ -2306,14 +2650,14 @@ eventFrame:SetScript("OnEvent", function(self, event)
         BuildCircle()
         ApplyBlizzardCombatTextSetting()
         ApplyBlizzardBagBarSetting()
-        ApplyChatFont()
-        SetupChatFontHooks()
         ApplyAllActionBarMouseovers()
         AnchorCombatTimer()
         UpdateCombatTimerAppearance()
         InitGateway()
         InitLustTracker()
+        InitBuffTrackers()
         CreateSettingsPanel()
-        print("|cFF00FF00UsefulStuff|r loaded! Configure in ESC > Options > AddOns > UsefulStuff")
+        CreateBlizzardLauncherPanel()
+        print("|cFF00FF00UsefulStuff|r loaded! Type /usefulstuff (or /us) to open, or ESC > Options > AddOns > UsefulStuff")
     end
 end)
